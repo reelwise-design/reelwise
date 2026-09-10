@@ -1,30 +1,34 @@
 export default async function handler(req, res) {
-  const query = req.query.q;
-
-  if (!query) {
-    return res.status(400).json({ error: "Missing search query" });
-  }
-
   const token = process.env.TMDB_READ_ACCESS_TOKEN;
+  const { q, type, id } = req.query;
 
   if (!token) {
     return res.status(500).json({ error: "TMDB token is not configured" });
   }
 
   try {
-    const response = await fetch(
-      `https://api.themoviedb.org/3/search/multi?query=${encodeURIComponent(query)}&include_adult=false&language=en-US&page=1`,
-      {
-        headers: {
-          Authorization: `Bearer ${token}`,
-          accept: "application/json"
-        }
+    let url;
+
+    if (type === "movie" && id) {
+      url = `https://api.themoviedb.org/3/movie/${id}?language=en-US&append_to_response=credits`;
+    } else if (type === "person" && id) {
+      url = `https://api.themoviedb.org/3/person/${id}?language=en-US&append_to_response=combined_credits`;
+    } else if (q) {
+      url = `https://api.themoviedb.org/3/search/multi?query=${encodeURIComponent(q)}&include_adult=false&language=en-US&page=1`;
+    } else {
+      return res.status(400).json({ error: "Missing search query or ID" });
+    }
+
+    const response = await fetch(url, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+        accept: "application/json"
       }
-    );
+    });
 
     if (!response.ok) {
       return res.status(response.status).json({
-        error: "TMDB search failed"
+        error: "TMDB request failed"
       });
     }
 
