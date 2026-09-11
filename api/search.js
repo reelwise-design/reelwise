@@ -536,7 +536,7 @@ for (const item of targetCastMovies) {
     formatResult(path)
   );
 }
-     * NORMAL REELWISE SEARCH
+     /* NORMAL REELWISE SEARCH
      */
 
     let url;
