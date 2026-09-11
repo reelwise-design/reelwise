@@ -210,9 +210,7 @@ nav button:hover{color:white}
 }
 
 .info{padding:13px}
-
 .info b{display:block}
-
 .info small{color:var(--muted)}
 
 .feature{
@@ -469,6 +467,39 @@ nav button:hover{color:white}
   padding:20px 0
 }
 
+.creditSection{
+  margin-top:30px
+}
+
+.creditSection h2{
+  font-size:28px;
+  margin-bottom:18px
+}
+
+.creditCard{
+  background:var(--panel);
+  border:1px solid var(--line);
+  border-radius:12px;
+  overflow:hidden;
+  cursor:pointer
+}
+
+.creditCard .poster{
+  aspect-ratio:2/3
+}
+
+.creditCharacter{
+  color:var(--muted);
+  margin-top:5px;
+  font-size:13px
+}
+
+.selfNote{
+  color:var(--gold);
+  font-size:13px;
+  margin-top:4px
+}
+
 .footer{
   border-top:1px solid var(--line);
   color:#737d8b;
@@ -679,75 +710,73 @@ function showError(message){
   `;
 }
 
-function year(date){
-  return date ? String(date).slice(0,4) : "";
-}
+function moviePoster(path,title){
+  if(path){
+    return `
+      <img
+        src="https://image.tmdb.org/t/p/w500${escapeHtml(path)}"
+        alt="${escapeHtml(title)}">
+    `;
+  }
 
-function posterUrl(path){
-  return path
-    ? `https://image.tmdb.org/t/p/w500${path}`
-    : "";
+  return `<span>${escapeHtml(title)}</span>`;
 }
 
 function renderHome(){
   app.innerHTML = `
     <div class="page">
+
       <div class="wrap">
 
         <section class="hero">
+
           <div>
-            <div class="eyebrow">THE MOVIE DATABASE FOR MOVIE PEOPLE</div>
+            <div class="eyebrow">WELCOME TO REELWISE</div>
             <h1>Know the movie.<br>Know the story.</h1>
             <p>
-              Reelwise brings movies, stars, quotes, stories and
-              behind-the-scenes information together in one place.
+              Explore movies, stars, memorable quotes, stories and
+              the connections between Hollywood's biggest names.
             </p>
-            <button class="cta" onclick="document.getElementById('searchInput').focus()">
-              Explore Movies
+            <button class="cta" onclick="showPage('sixdegrees')">
+              Play Six Degrees
             </button>
           </div>
 
           <div class="heroCard">
-            <div class="eyebrow">FEATURED</div>
-            <b>Movies are more than a title.</b>
+            <div class="eyebrow">WHAT MAKES REELWISE DIFFERENT?</div>
+            <b>Movies are more than a database.</b>
             <p class="muted">
-              Discover the people, moments and stories behind the movies you love.
+              Discover the people, quotes, stories and connections
+              behind the movies you love.
             </p>
           </div>
+
         </section>
 
         <section class="section">
+
           <div class="sectionhead">
             <h2>Featured Movies</h2>
           </div>
 
           <div class="grid">
             ${featuredMovies.map(movie => `
-              <div class="card" onclick="searchMovie('${escapeHtml(movie.title)}')">
+              <div class="card"
+                   onclick="searchAndOpenMovie('${escapeHtml(movie.title)}')">
+
                 <div class="poster">
                   <span>${movie.icon} ${escapeHtml(movie.title)}</span>
                 </div>
+
                 <div class="info">
                   <b>${escapeHtml(movie.title)}</b>
                   <small>${movie.year} · ${escapeHtml(movie.genre)}</small>
                 </div>
+
               </div>
             `).join("")}
           </div>
-        </section>
 
-        <section class="section">
-          <div class="feature">
-            <div class="eyebrow">REELWISE ORIGINAL</div>
-            <h3>Six Degrees</h3>
-            <p>
-              Pick any two actors and see whether Reelwise can connect them
-              through six films or fewer.
-            </p>
-            <button class="cta" onclick="renderSixDegrees()">
-              Play Six Degrees
-            </button>
-          </div>
         </section>
 
       </div>
@@ -755,19 +784,47 @@ function renderHome(){
   `;
 }
 
-async function searchMovie(title){
-  document.getElementById("searchInput").value = title;
-  await performSearch(title);
+async function searchAndOpenMovie(title){
+  showLoading();
+
+  try{
+    const response = await fetch(
+      `/api/search?query=${encodeURIComponent(title)}`
+    );
+
+    const data = await response.json();
+
+    const movie =
+      (data.movies || []).find(
+        m => String(m.title).toLowerCase() === title.toLowerCase()
+      ) ||
+      (data.results || []).find(
+        m =>
+          m.media_type === "movie" &&
+          String(m.title).toLowerCase() === title.toLowerCase()
+      );
+
+    if(!movie){
+      throw new Error("Movie not found.");
+    }
+
+    openMovie(movie.id);
+
+  }catch(error){
+    showError(error.message);
+  }
 }
 
 async function performSearch(query){
+
   if(!query.trim()) return;
 
   showLoading();
 
   try{
+
     const response = await fetch(
-      `/api/search?q=${encodeURIComponent(query.trim())}`
+      `/api/search?query=${encodeURIComponent(query)}`
     );
 
     const data = await response.json();
@@ -776,13 +833,16 @@ async function performSearch(query){
       throw new Error(data.error || "Search failed.");
     }
 
-    renderSearchResults(data.results || []);
+    renderSearchResults(data);
+
   }catch(error){
     showError(error.message);
   }
 }
 
-function renderSearchResults(results){
+function renderSearchResults(data){
+
+  const results = data.results || [];
 
   if(!results.length){
     app.innerHTML = `
@@ -790,7 +850,9 @@ function renderSearchResults(results){
         <div class="wrap">
           <div class="empty">
             <h2>No results found</h2>
-            <p class="muted">Try another movie or actor.</p>
+            <p class="muted">
+              Try another movie or star.
+            </p>
           </div>
         </div>
       </div>
@@ -802,57 +864,51 @@ function renderSearchResults(results){
     <div class="page">
       <div class="wrap">
 
-        <button class="back" onclick="renderHome()">← Back to Reelwise</button>
+        <button class="back" onclick="renderHome()">
+          ← Back to Reelwise
+        </button>
 
         <h1>Search Results</h1>
 
         <div class="resultList">
 
-          ${results.map(result => {
+          ${results.map(item => {
 
-            const type = result.result_type;
-
-            if(type === "person"){
-              return `
-                <div class="result"
-                     onclick="openPerson(${Number(result.id)})">
-
-                  <div>
-                    <div class="resultType">Star</div>
-                    <div class="resultTitle">
-                      ${escapeHtml(result.name)}
-                    </div>
-                  </div>
-
-                  <div class="muted">→</div>
-                </div>
-              `;
-            }
+            const isPerson = item.media_type === "person";
+            const title = isPerson ? item.name : item.title;
+            const date = isPerson
+              ? "Star"
+              : (item.release_date || "").slice(0,4);
 
             return `
               <div class="result"
-                   onclick="openMovie(${Number(result.id)})">
+                   onclick="${
+                     isPerson
+                     ? `openPerson(${item.id})`
+                     : `openMovie(${item.id})`
+                   }">
 
                 <div>
-                  <div class="resultType">Movie</div>
                   <div class="resultTitle">
-                    ${escapeHtml(
-                      result.title ||
-                      result.original_title ||
-                      "Untitled"
-                    )}
+                    ${escapeHtml(title)}
                   </div>
+
                   <div class="muted">
-                    ${escapeHtml(year(result.release_date))}
+                    ${escapeHtml(date)}
                   </div>
                 </div>
 
-                <div class="muted">→</div>
+                <div class="resultType">
+                  ${isPerson ? "Star" : "Movie"}
+                </div>
+
               </div>
             `;
+
           }).join("")}
 
         </div>
+
       </div>
     </div>
   `;
@@ -883,54 +939,41 @@ async function openMovie(id){
 
 function renderMovie(movie){
 
-  const cast = movie.credits?.cast || [];
-  const movieQuotes = quotes[movie.title] || [];
+  const cast =
+    movie.credits?.cast ||
+    [];
 
-  const genres = Array.isArray(movie.genres)
-    ? movie.genres.map(g => g.name).join(" · ")
-    : "";
+  const movieQuotes =
+    quotes[movie.title] ||
+    [];
+
+  const year =
+    (movie.release_date || "").slice(0,4);
 
   app.innerHTML = `
     <div class="page">
       <div class="wrap">
 
         <button class="back" onclick="renderHome()">
-          ← Back to Reelwise
+          ← Back
         </button>
 
         <div class="detail">
 
           <div class="detailposter">
-            ${
-              movie.poster_path
-              ? `<img src="${posterUrl(movie.poster_path)}"
-                       alt="${escapeHtml(movie.title)}">`
-              : ""
-            }
+            ${moviePoster(movie.poster_path,movie.title)}
           </div>
 
           <div>
 
             <div class="eyebrow">
-              ${escapeHtml(year(movie.release_date))}
-              ${genres ? " · " + escapeHtml(genres) : ""}
+              ${escapeHtml(year)}
             </div>
 
-            <h1>
-              ${escapeHtml(movie.title || "Untitled")}
-            </h1>
+            <h1>${escapeHtml(movie.title)}</h1>
 
-            ${
-              movie.tagline
-              ? `<p class="muted">${escapeHtml(movie.tagline)}</p>`
-              : ""
-            }
-
-            <p>
-              ${escapeHtml(
-                movie.overview ||
-                "No synopsis available."
-              )}
+            <p class="muted">
+              ${escapeHtml(movie.overview || "No overview available.")}
             </p>
 
             <div class="facts">
@@ -941,19 +984,13 @@ function renderMovie(movie){
               </div>
 
               <div class="fact">
-                <b>
-                  ${
-                    movie.vote_average
-                    ? Number(movie.vote_average).toFixed(1)
-                    : "—"
-                  }
-                </b>
-                <small>TMDB Rating</small>
+                <b>${movie.vote_average ? movie.vote_average.toFixed(1) : "—"}</b>
+                <small>Rating</small>
               </div>
 
               <div class="fact">
-                <b>${escapeHtml(year(movie.release_date) || "—")}</b>
-                <small>Release Year</small>
+                <b>${cast.length}</b>
+                <small>Cast Members</small>
               </div>
 
             </div>
@@ -965,100 +1002,47 @@ function renderMovie(movie){
         <section class="section">
 
           <div class="sectionhead">
-            <h2>Cast</h2>
+            <h2>Entire Cast</h2>
           </div>
 
-          ${
-            cast.length
-            ? `
-              <div class="cast">
-                ${cast.map(person => `
-                  <button
-                    onclick="openPerson(${Number(person.id)})">
-                    ${escapeHtml(person.name)}
-                    ${
-                      person.character
-                      ? `<span class="muted">
-                           — ${escapeHtml(person.character)}
-                         </span>`
-                      : ""
-                    }
-                  </button>
-                `).join("")}
-              </div>
-            `
-            : `<div class="empty">No cast information available.</div>`
-          }
+          <div class="cast">
+
+            ${cast.map(person => `
+              <button onclick="openPerson(${person.id})">
+                ${escapeHtml(person.name)}
+                ${
+                  person.character
+                  ? ` · ${escapeHtml(person.character)}`
+                  : ""
+                }
+              </button>
+            `).join("")}
+
+          </div>
 
         </section>
-
-        ${
-          movieQuotes.length
-          ? `
-            <section class="section">
-
-              <div class="sectionhead">
-                <h2>Memorable Quotes</h2>
-              </div>
-
-              <div class="feature">
-                ${movieQuotes.map(q => `
-                  <div class="quote">
-                    “${escapeHtml(q)}”
-                  </div>
-                `).join("")}
-              </div>
-
-            </section>
-          `
-          : ""
-        }
 
         <section class="section">
 
           <div class="sectionhead">
-            <h2>Movie Details</h2>
+            <h2>Memorable Quotes</h2>
           </div>
 
-          <div class="feature">
-
-            ${
-              movie.director
-              ? `<p><b>Director:</b> ${escapeHtml(movie.director)}</p>`
-              : ""
-            }
-
-            ${
-              movie.production_companies?.length
-              ? `
-                <p>
-                  <b>Production:</b>
-                  ${escapeHtml(
-                    movie.production_companies
-                      .map(c => c.name)
-                      .join(", ")
-                  )}
+          ${
+            movieQuotes.length
+            ? movieQuotes.map(q => `
+                <div class="quote">
+                  “${escapeHtml(q)}”
+                </div>
+              `).join("")
+            : `
+              <div class="empty">
+                <p class="muted">
+                  More memorable quotes coming to Reelwise.
                 </p>
-              `
-              : ""
-            }
-
-            ${
-              movie.homepage
-              ? `
-                <p>
-                  <a href="${escapeHtml(movie.homepage)}"
-                     target="_blank"
-                     rel="noopener"
-                     style="color:var(--accent)">
-                    Official Movie Website
-                  </a>
-                </p>
-              `
-              : ""
-            }
-
-          </div>
+              </div>
+            `
+          }
 
         </section>
 
@@ -1073,13 +1057,6 @@ async function openPerson(id){
 
   try{
 
-    /*
-      IMPORTANT:
-      This uses person-details rather than person.
-      The backend returns combined_credits here,
-      giving the actor page their movie credits.
-    */
-
     const response = await fetch(
       `/api/search?type=person-details&id=${encodeURIComponent(id)}`
     );
@@ -1087,7 +1064,7 @@ async function openPerson(id){
     const person = await response.json();
 
     if(!response.ok){
-      throw new Error(person.error || "Could not load actor.");
+      throw new Error(person.error || "Could not load star.");
     }
 
     renderPerson(person);
@@ -1104,37 +1081,56 @@ function renderPerson(person){
     person.movie_credits?.cast ||
     [];
 
-  const sortedCredits = [...credits]
-    .filter(movie => movie && movie.id)
-    .sort((a,b) => {
-      const yearA = Number(year(a.release_date)) || 0;
-      const yearB = Number(year(b.release_date)) || 0;
-      return yearB - yearA;
-    });
+  const actingCredits = [];
+  const selfCredits = [];
 
-  const birthday = person.birthday
-    ? new Date(person.birthday + "T00:00:00")
-        .toLocaleDateString("en-US",{
-          month:"long",
-          day:"numeric",
-          year:"numeric"
-        })
-    : "";
+  credits.forEach(credit => {
 
-  const deathday = person.deathday
-    ? new Date(person.deathday + "T00:00:00")
-        .toLocaleDateString("en-US",{
-          month:"long",
-          day:"numeric",
-          year:"numeric"
-        })
-    : "";
+    const character =
+      String(credit.character || "").trim();
+
+    const isSelf =
+      /^self\b/i.test(character) ||
+      /^himself\b/i.test(character) ||
+      /^herself\b/i.test(character) ||
+      /^themselves\b/i.test(character);
+
+    const isArchive =
+      /archive footage/i.test(character);
+
+    if(isArchive) return;
+
+    if(isSelf){
+      selfCredits.push(credit);
+    }else{
+      actingCredits.push(credit);
+    }
+
+  });
+
+  const uniqueActing = uniqueCredits(actingCredits);
+  const uniqueSelf = uniqueCredits(selfCredits);
+
+  const profilePhoto =
+    person.profile_path
+      ? `https://image.tmdb.org/t/p/w500${person.profile_path}`
+      : "";
+
+  const birthday =
+    person.birthday
+      ? formatDate(person.birthday)
+      : "—";
+
+  const deathday =
+    person.deathday
+      ? formatDate(person.deathday)
+      : "";
 
   app.innerHTML = `
     <div class="page">
       <div class="wrap">
 
-        <button class="back" onclick="history.length > 1 ? history.back() : renderHome()">
+        <button class="back" onclick="renderHome()">
           ← Back
         </button>
 
@@ -1143,180 +1139,285 @@ function renderPerson(person){
           <div
             class="personPhoto"
             ${
-              person.profile_path
-              ? `style="background-image:url('${posterUrl(person.profile_path)}')"`
+              profilePhoto
+              ? `style="background-image:url('${profilePhoto}')"`
               : ""
             }
           >
             ${
-              person.profile_path
+              profilePhoto
               ? ""
-              : escapeHtml(
-                  (person.name || "?")
-                    .charAt(0)
-                    .toUpperCase()
-                )
+              : escapeHtml(person.name?.charAt(0) || "?")
             }
           </div>
 
           <div class="personIntro">
 
-            <div class="eyebrow">REELWISE STAR</div>
+            <div class="eyebrow">
+              REELWISE STAR
+            </div>
 
             <h1>
-              ${escapeHtml(person.name || "Unknown")}
+              ${escapeHtml(person.name)}
             </h1>
 
             <div class="personMeta">
 
               ${
                 person.known_for_department
-                ? `<span>${escapeHtml(
-                    person.known_for_department
-                  )}</span>`
+                ? `<span>${escapeHtml(person.known_for_department)}</span>`
                 : ""
               }
 
               ${
                 person.place_of_birth
-                ? `<span>${escapeHtml(
-                    person.place_of_birth
-                  )}</span>`
+                ? `<span>${escapeHtml(person.place_of_birth)}</span>`
                 : ""
               }
 
             </div>
 
+            <div class="facts">
+
+              <div class="fact">
+                <b>${birthday}</b>
+                <small>Born</small>
+              </div>
+
+              <div class="fact">
+                <b>${uniqueActing.length}</b>
+                <small>Acting Credits</small>
+              </div>
+
+              <div class="fact">
+                <b>${uniqueSelf.length}</b>
+                <small>As Himself</small>
+              </div>
+
+            </div>
+
             ${
-              birthday
+              deathday
               ? `
-                <div class="facts">
-
-                  <div class="fact">
-                    <b>${escapeHtml(birthday)}</b>
-                    <small>Born</small>
-                  </div>
-
-                  ${
-                    deathday
-                    ? `
-                      <div class="fact">
-                        <b>${escapeHtml(deathday)}</b>
-                        <small>Died</small>
-                      </div>
-                    `
-                    : ""
-                  }
-
-                  <div class="fact">
-                    <b>${sortedCredits.length}</b>
-                    <small>Movie Credits</small>
-                  </div>
-
+                <div class="personMeta">
+                  <span>Died ${deathday}</span>
                 </div>
               `
               : ""
             }
 
             <p>
-              ${escapeHtml(
-                person.biography ||
-                "Reelwise biography coming soon."
-              )}
+              ${
+                escapeHtml(
+                  person.biography ||
+                  "Biography information coming to Reelwise."
+                )
+              }
             </p>
 
           </div>
 
         </div>
 
-        <section class="section">
+        <section class="creditSection">
 
-          <div class="sectionhead">
-            <h2>Movies</h2>
-          </div>
+          <h2>Acting Credits</h2>
 
           ${
-            sortedCredits.length
+            uniqueActing.length
             ? `
               <div class="grid">
-
-                ${sortedCredits.slice(0,40).map(movie => `
-                  <div class="card"
-                       onclick="openMovie(${Number(movie.id)})">
-
-                    <div class="poster">
-
-                      ${
-                        movie.poster_path
-                        ? `
-                          <img
-                            src="${posterUrl(movie.poster_path)}"
-                            alt="${escapeHtml(
-                              movie.title ||
-                              movie.original_title ||
-                              ""
-                            )}">
-                        `
-                        : ""
-                      }
-
-                      ${
-                        !movie.poster_path
-                        ? `
-                          <span>
-                            ${escapeHtml(
-                              movie.title ||
-                              movie.original_title ||
-                              "Movie"
-                            )}
-                          </span>
-                        `
-                        : ""
-                      }
-
-                    </div>
-
-                    <div class="info">
-
-                      <b>
-                        ${escapeHtml(
-                          movie.title ||
-                          movie.original_title ||
-                          "Untitled"
-                        )}
-                      </b>
-
-                      <small>
-                        ${escapeHtml(
-                          year(movie.release_date)
-                        )}
-
-                        ${
-                          movie.character
-                          ? ` · ${escapeHtml(movie.character)}`
-                          : ""
-                        }
-                      </small>
-
-                    </div>
-
-                  </div>
-                `).join("")}
-
+                ${uniqueActing.slice(0,40).map(creditCard).join("")}
               </div>
             `
             : `
               <div class="empty">
-                No movie credits available.
+                <p class="muted">
+                  No acting credits found.
+                </p>
               </div>
             `
           }
 
         </section>
 
+        ${
+          uniqueSelf.length
+          ? `
+            <section class="creditSection">
+
+              <h2>As Himself</h2>
+
+              <p class="muted">
+                Interviews, documentaries, appearances and other
+                credits where the star appeared as themselves.
+              </p>
+
+              <div class="grid">
+                ${uniqueSelf.slice(0,30).map(selfCreditCard).join("")}
+              </div>
+
+            </section>
+          `
+          : ""
+        }
+
       </div>
     </div>
   `;
+}
+
+function uniqueCredits(list){
+
+  const seen = new Set();
+
+  return list.filter(item => {
+
+    const id =
+      item.id ||
+      `${item.title}-${item.release_date}`;
+
+    if(seen.has(id)){
+      return false;
+    }
+
+    seen.add(id);
+    return true;
+
+  });
+}
+
+function creditCard(credit){
+
+  const title =
+    credit.title ||
+    credit.name ||
+    "Untitled";
+
+  const year =
+    (
+      credit.release_date ||
+      credit.first_air_date ||
+      ""
+    ).slice(0,4);
+
+  const character =
+    credit.character ||
+    "";
+
+  return `
+    <div
+      class="creditCard"
+      onclick="openMovie(${credit.id})"
+    >
+
+      <div class="poster">
+        ${moviePoster(credit.poster_path,title)}
+      </div>
+
+      <div class="info">
+
+        <b>${escapeHtml(title)}</b>
+
+        <small>
+          ${escapeHtml(year)}
+        </small>
+
+        ${
+          character
+          ? `
+            <div class="creditCharacter">
+              ${escapeHtml(character)}
+            </div>
+          `
+          : ""
+        }
+
+      </div>
+
+    </div>
+  `;
+}
+
+function selfCreditCard(credit){
+
+  const title =
+    credit.title ||
+    credit.name ||
+    "Untitled";
+
+  const year =
+    (
+      credit.release_date ||
+      credit.first_air_date ||
+      ""
+    ).slice(0,4);
+
+  return `
+    <div
+      class="creditCard"
+      onclick="openMovie(${credit.id})"
+    >
+
+      <div class="poster">
+        ${moviePoster(credit.poster_path,title)}
+      </div>
+
+      <div class="info">
+
+        <b>${escapeHtml(title)}</b>
+
+        <small>${escapeHtml(year)}</small>
+
+        <div class="selfNote">
+          As Himself
+        </div>
+
+      </div>
+
+    </div>
+  `;
+}
+
+function formatDate(date){
+
+  if(!date) return "—";
+
+  const parts = date.split("-");
+
+  if(parts.length !== 3){
+    return date;
+  }
+
+  return `${parts[1]}/${parts[2]}/${parts[0]}`;
+}
+
+function showPage(page){
+
+  if(page === "home"){
+    renderHome();
+    return;
+  }
+
+  if(page === "discover"){
+    renderDiscover();
+    return;
+  }
+
+  if(page === "stars"){
+    renderStars();
+    return;
+  }
+
+  if(page === "stories"){
+    renderStories();
+    return;
+  }
+
+  if(page === "sixdegrees"){
+    renderSixDegrees();
+    return;
+  }
 }
 
 function renderDiscover(){
@@ -1325,18 +1426,17 @@ function renderDiscover(){
     <div class="page">
       <div class="wrap">
 
-        <div class="eyebrow">DISCOVER</div>
-        <h1>Find something to watch.</h1>
+        <button class="back" onclick="renderHome()">
+          ← Back
+        </button>
 
-        <p class="muted">
-          Search Reelwise for movies and stars using the search bar above.
-        </p>
+        <h1>Discover</h1>
 
         <div class="feature">
-          <h3>Looking for a movie?</h3>
+          <h3>Find your next favorite movie.</h3>
           <p>
-            Try searching for Rocky, Top Gun, Jaws, Goodfellas,
-            The Godfather, or any other movie.
+            Search Reelwise for movies and stars, then explore
+            their casts, quotes, stories and connections.
           </p>
         </div>
 
@@ -1351,18 +1451,17 @@ function renderStars(){
     <div class="page">
       <div class="wrap">
 
-        <div class="eyebrow">STARS</div>
-        <h1>Hollywood's biggest names.</h1>
+        <button class="back" onclick="renderHome()">
+          ← Back
+        </button>
 
-        <p class="muted">
-          Search for any actor above to explore their Reelwise star page.
-        </p>
+        <h1>Stars</h1>
 
         <div class="feature">
-          <h3>Try a star</h3>
+          <h3>Hollywood's biggest stars.</h3>
           <p>
-            Sylvester Stallone · Tom Cruise · Robert De Niro ·
-            Tom Hanks · Harrison Ford
+            Search for any actor or actress to explore their
+            biography, acting credits and appearances as themselves.
           </p>
         </div>
 
@@ -1377,22 +1476,17 @@ function renderStories(){
     <div class="page">
       <div class="wrap">
 
-        <div class="eyebrow">REELWISE STORIES</div>
-        <h1>Behind the movies.</h1>
+        <button class="back" onclick="renderHome()">
+          ← Back
+        </button>
+
+        <h1>Stories</h1>
 
         <div class="feature">
-          <h3>More than a database.</h3>
+          <h3>The stories behind the movies.</h3>
           <p>
-            Reelwise is being built around the stories, stars,
-            quotes and moments that make movies memorable.
-          </p>
-        </div>
-
-        <div class="feature">
-          <h3>Real stories. Hollywood stories.</h3>
-          <p>
-            Discover the fascinating stories behind the movies
-            and the people who made them.
+            Reelwise will bring together behind-the-scenes stories,
+            Hollywood facts, memorable moments and more.
           </p>
         </div>
 
@@ -1408,25 +1502,38 @@ function renderSixDegrees(){
 
       <div class="wrap">
 
+        <button class="back" onclick="renderHome()">
+          ← Back
+        </button>
+
         <div class="degreeBox">
 
-          <div class="eyebrow">REELWISE GAME</div>
+          <div class="eyebrow">
+            THE REELWISE GAME
+          </div>
 
           <h1>Six Degrees</h1>
 
           <p class="muted">
-            Connect any two actors through six films or fewer.
+            Can you connect any two movie stars in six movies or less?
           </p>
 
-          <form class="degreeForm" id="degreeForm">
+          <form
+            class="degreeForm"
+            id="degreeForm"
+          >
 
             <input
               id="degreeFrom"
-              placeholder="First actor — Tom Cruise">
+              placeholder="First actor — Tom Cruise"
+              required
+            >
 
             <input
               id="degreeTo"
-              placeholder="Second actor — Sylvester Stallone">
+              placeholder="Second actor — Sylvester Stallone"
+              required
+            >
 
             <button type="submit">
               Connect
@@ -1445,10 +1552,10 @@ function renderSixDegrees(){
 
   document
     .getElementById("degreeForm")
-    .addEventListener("submit", runSixDegrees);
+    .addEventListener("submit",findConnection);
 }
 
-async function runSixDegrees(event){
+async function findConnection(event){
 
   event.preventDefault();
 
@@ -1461,22 +1568,10 @@ async function runSixDegrees(event){
   const output =
     document.getElementById("degreeOutput");
 
-  if(!from || !to){
+  if(!from || !to) return;
 
-    output.innerHTML = `
-      <div class="error">
-        Enter two actor names.
-      </div>
-    `;
-
-    return;
-  }
-
-  output.innerHTML = `
-    <div class="loading">
-      Finding the connection…
-    </div>
-  `;
+  output.innerHTML =
+    `<div class="loading">Finding the connection…</div>`;
 
   try{
 
@@ -1488,12 +1583,11 @@ async function runSixDegrees(event){
 
     if(!response.ok){
       throw new Error(
-        data.error ||
-        "We couldn't find that connection."
+        data.error || "Could not find the connection."
       );
     }
 
-    renderDegreeResult(data);
+    renderConnection(data);
 
   }catch(error){
 
@@ -1505,70 +1599,71 @@ async function runSixDegrees(event){
   }
 }
 
-function renderDegreeResult(data){
+function renderConnection(data){
 
   const output =
     document.getElementById("degreeOutput");
 
-  const path = Array.isArray(data.path)
-    ? data.path
-    : [];
+  if(!data || !data.path || !data.path.length){
+
+    output.innerHTML = `
+      <div class="empty">
+        <h2>We couldn't find that connection.</h2>
+        <p class="muted">
+          Try two different actors.
+        </p>
+      </div>
+    `;
+
+    return;
+  }
 
   let html = `
     <div class="degreeResult">
 
       <div class="degreeTitle">
         ${escapeHtml(data.from.name)}
-        →
+        → 
         ${escapeHtml(data.to.name)}
       </div>
-
-      <p class="muted">
-        ${data.distance === 1
-          ? "Direct movie connection"
-          : `${data.distance} degrees apart`}
-      </p>
   `;
 
-  for(let i=0;i<path.length;i++){
+  for(let i=0;i<data.path.length;i++){
 
-    const step = path[i];
+    const step =
+      data.path[i];
 
-    if(step.person){
+    html += `
+      <div class="connection">
 
+        <div class="connectionActor">
+          ${escapeHtml(step.person.name)}
+        </div>
+
+        ${
+          step.movie
+          ? `
+            <div class="connectionMovie">
+              🎬 ${escapeHtml(step.movie.title)}
+              ${
+                step.movie.year
+                ? ` (${escapeHtml(step.movie.year)})`
+                : ""
+              }
+            </div>
+          `
+          : ""
+        }
+
+      </div>
+    `;
+
+    if(i < data.path.length - 1){
       html += `
-        <div class="connection">
-
-          <div class="connectionActor">
-            ${escapeHtml(step.person.name)}
-          </div>
-
-          ${
-            step.movie
-            ? `
-              <div class="connectionMovie">
-                ${escapeHtml(step.movie.title)}
-                ${
-                  step.movie.year
-                  ? ` (${escapeHtml(step.movie.year)})`
-                  : ""
-                }
-              </div>
-            `
-            : ""
-          }
-
+        <div class="connectionArrow">
+          ↓
         </div>
       `;
-
-      if(i < path.length - 1){
-
-        html += `
-          <div class="connectionArrow">
-            ↓
-          </div>
-        `;
-      }
     }
   }
 
@@ -1581,34 +1676,26 @@ function renderDegreeResult(data){
 
 document
   .getElementById("searchForm")
-  .addEventListener("submit", event => {
+  .addEventListener("submit",event => {
 
     event.preventDefault();
 
-    const query =
-      document.getElementById("searchInput").value.trim();
+    performSearch(
+      document.getElementById("searchInput").value
+    );
 
-    performSearch(query);
   });
 
 document
   .getElementById("logo")
-  .addEventListener("click", renderHome);
+  .addEventListener("click",renderHome);
 
 document
   .querySelectorAll("nav button")
   .forEach(button => {
 
-    button.addEventListener("click", () => {
-
-      const page = button.dataset.page;
-
-      if(page === "home") renderHome();
-      if(page === "discover") renderDiscover();
-      if(page === "stars") renderStars();
-      if(page === "stories") renderStories();
-      if(page === "sixdegrees") renderSixDegrees();
-
+    button.addEventListener("click",() => {
+      showPage(button.dataset.page);
     });
 
   });
