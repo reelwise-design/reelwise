@@ -1,16 +1,14 @@
 export default async function handler(req, res) {
   const token = process.env.TMDB_READ_ACCESS_TOKEN;
   const { q, type, id, from, to } = req.query;
-
   if (!token) {
     return res.status(500).json({
-      error: "TMDB token is not configured"
+      error: "TMDB token is not configured."
     });
   }
-
-  const tmdb = async (path) => {
+  async function tmdb(endpoint) {
     const response = await fetch(
-      `https://api.themoviedb.org/3${path}`,
+      `https://api.themoviedb.org/3${endpoint}`,
       {
         headers: {
           Authorization: `Bearer ${token}`,
@@ -18,84 +16,59 @@ export default async function handler(req, res) {
         }
       }
     );
-
     if (!response.ok) {
       const text = await response.text();
-      throw new Error(
-        `TMDB request failed: ${response.status} ${text}`
-      );
+      throw new Error(`TMDB ${response.status}: ${text}`);
     }
-
     return response.json();
-  };
-
+  }
   try {
     /*
      * ============================================================
      * SIX DEGREES
      * ============================================================
      */
-
     if (type === "degrees") {
       if (!from || !to) {
         return res.status(400).json({
-          error: "Both actors are required"
+          error: "Enter two actors."
         });
       }
-
-      /*
-       * Find the actor in TMDB.
-       */
-      const findPerson = async (name) => {
+      // ----------------------------------------------------------
+      // Find an actor by name
+      // ----------------------------------------------------------
+      async function findActor(name) {
         const data = await tmdb(
           `/search/person?query=${encodeURIComponent(
-            name.trim()
+            name
           )}&include_adult=false&language=en-US&page=1`
         );
-
-        const results = data.results || [];
-
-        /*
-         * Prefer an exact name match.
-         */
-        const exact = results.find(
-          (person) =>
+        const people = data.results || [];
+        const exact = people.find(
+          person =>
             person.name &&
             person.name.toLowerCase() ===
               name.trim().toLowerCase()
         );
-
-        /*
-         * Otherwise prefer someone whose department
-         * is Acting.
-         */
         const actor =
           exact ||
-          results.find(
-            (person) =>
+          people.find(
+            person =>
               person.known_for_department === "Acting"
-          );
-
+          ) ||
+          people[0];
         if (!actor) {
           throw new Error(
-            `I couldn't find ${name}.`
+            `Actor not found: ${name}`
           );
         }
-
         return {
           id: actor.id,
           name: actor.name
         };
-      };
-
-      const [start, target] = await Promise.all([
-        findPerson(from),
-        findPerson(to)
-      ]);
-
-      /*
-       * Same actor.
-       */
+      }
+      const start = await findActor(from);
+      const target = await findActor(to);
       if (start.id === target.id) {
         return res.status(200).json({
           from: start,
@@ -109,52 +82,25 @@ export default async function handler(req, res) {
           ]
         });
       }
-
-      /*
-       * ============================================================
-       * CREDIT FILTERING
-       * ============================================================
-       */
-
-      const isRealActingCredit = (credit) => {
-        if (!credit) {
+      // ----------------------------------------------------------
+      // Get real movie acting credits
+      // ----------------------------------------------------------
+      const peopleMovies = new Map();
+      const movieCredits = new Map();
+      function validActingCredit(movie) {
+        if (!movie || !movie.id || !movie.title) {
           return false;
         }
-
-        if (!credit.id) {
-          return false;
-        }
-
-        if (!credit.title) {
-          return false;
-        }
-
-        /*
-         * Exclude documentaries.
-         */
-        if (
-          Array.isArray(credit.genre_ids) &&
-          credit.genre_ids.includes(99)
-        ) {
-          return false;
-        }
-
         const character = String(
-          credit.character || ""
+          movie.character || ""
         )
           .trim()
           .toLowerCase();
-
-        /*
-         * Require an actual character.
-         */
+        // Must have an actual character.
         if (!character) {
           return false;
         }
-
-        /*
-         * Exclude appearances as themselves.
-         */
+        // Never count Self appearances.
         if (
           character === "self" ||
           character === "himself" ||
@@ -163,96 +109,151 @@ export default async function handler(req, res) {
         ) {
           return false;
         }
-
-        /*
-         * Exclude archive footage.
-         */
+        // Never count archive footage.
         if (
           character.includes("archive footage") ||
           character.includes("archival footage")
         ) {
           return false;
         }
-
-        return true;
-      };
-
-      /*
-       * ============================================================
-       * PERSON MOVIE CREDITS
-       * ============================================================
-       */
-
-      const personMoviesCache = new Map();
-
-      const getPersonMovies = async (personId) => {
-        if (personMoviesCache.has(personId)) {
-          return personMoviesCache.get(personId);
+        // Never count documentaries.
+        if (
+          Array.isArray(movie.genre_ids) &&
+          movie.genre_ids.includes(99)
+        ) {
+          return false;
         }
-
+        return true;
+      }
+      async function getMovies(personId) {
+        if (peopleMovies.has(personId)) {
+          return peopleMovies.get(personId);
+        }
         const data = await tmdb(
           `/person/${personId}/movie_credits?language=en-US`
         );
-
         const movies = (data.cast || [])
-          .filter(isRealActingCredit)
-          .filter(
-            (movie) =>
-              movie.title &&
-              movie.id
-          )
-          .map((movie) => ({
+          .filter(validActingCredit)
+          .map(movie => ({
             id: movie.id,
             title: movie.title,
-            release_date:
-              movie.release_date || "",
-            character:
-              movie.character || "",
-            genre_ids:
-              movie.genre_ids || []
+            year: (movie.release_date || "").slice(0, 4),
+            character: movie.character || ""
           }));
-
-        personMoviesCache.set(
-          personId,
-          movies
-        );
-
+        peopleMovies.set(personId, movies);
         return movies;
-      };
-
-      /*
-       * ============================================================
-       * MOVIE CAST
-       * ============================================================
-       */
-
-      const movieCastCache = new Map();
-
-      const getMovieCast = async (movieId) => {
-        if (movieCastCache.has(movieId)) {
-          return movieCastCache.get(movieId);
+      }
+      // ----------------------------------------------------------
+      // DIRECT CONNECTION
+      //
+      // This is checked FIRST.
+      // If two actors were in the same movie, we're done.
+      // ----------------------------------------------------------
+      const startMovies = await getMovies(start.id);
+      const targetMovies = await getMovies(target.id);
+      const targetMovieIds = new Set(
+        targetMovies.map(movie =>
+          String(movie.id)
+        )
+      );
+      const direct = startMovies.find(movie =>
+        targetMovieIds.has(String(movie.id))
+      );
+      if (direct) {
+        return res.status(200).json({
+          from: start,
+          to: target,
+          distance: 1,
+          path: [
+            {
+              person: start,
+              movie: null
+            },
+            {
+              person: target,
+              movie: {
+                id: direct.id,
+                title: direct.title,
+                year: direct.year
+              }
+            }
+          ]
+        });
+      }
+      // ----------------------------------------------------------
+      // SECOND DIRECT CHECK BY TITLE
+      //
+      // This protects us if TMDB happens to return different
+      // movie IDs for the same film.
+      // ----------------------------------------------------------
+      const normalize = value =>
+        String(value || "")
+          .toLowerCase()
+          .replace(/[^a-z0-9]/g, "");
+      const targetTitles = new Map();
+      for (const movie of targetMovies) {
+        const key = normalize(movie.title);
+        if (key) {
+          targetTitles.set(key, movie);
         }
-
+      }
+      const titleMatch = startMovies.find(movie =>
+        targetTitles.has(normalize(movie.title))
+      );
+      if (titleMatch) {
+        const targetMovie =
+          targetTitles.get(
+            normalize(titleMatch.title)
+          );
+        return res.status(200).json({
+          from: start,
+          to: target,
+          distance: 1,
+          path: [
+            {
+              person: start,
+              movie: null
+            },
+            {
+              person: target,
+              movie: {
+                id: titleMatch.id,
+                title: titleMatch.title,
+                year:
+                  titleMatch.year ||
+                  targetMovie.year ||
+                  ""
+              }
+            }
+          ]
+        });
+      }
+      // ----------------------------------------------------------
+      // CO-STAR SEARCH
+      //
+      // Find actors who worked with each actor.
+      // Search outward until six movie connections.
+      // ----------------------------------------------------------
+      async function getCast(movieId) {
+        if (movieCredits.has(movieId)) {
+          return movieCredits.get(movieId);
+        }
         const data = await tmdb(
           `/movie/${movieId}/credits?language=en-US`
         );
-
         const cast = (data.cast || [])
-          .filter((person) => {
+          .filter(person => {
             if (!person.id || !person.name) {
               return false;
             }
-
             const character = String(
               person.character || ""
             )
               .trim()
               .toLowerCase();
-
             if (!character) {
               return false;
             }
-
             if (
               character === "self" ||
               character === "himself" ||
@@ -261,621 +262,137 @@ export default async function handler(req, res) {
             ) {
               return false;
             }
-
             if (
               character.includes("archive footage") ||
               character.includes("archival footage")
             ) {
               return false;
             }
-
             return true;
           })
-          .slice(0, 100);
-
-        movieCastCache.set(
-          movieId,
-          cast
-        );
-
+          .slice(0, 50);
+        movieCredits.set(movieId, cast);
         return cast;
-      };
-
-      /*
-       * ============================================================
-       * DIRECT CONNECTION
-       * ============================================================
-       *
-       * This is the most important part.
-       *
-       * We compare the complete TMDB movie-credit lists for
-       * both actors using the actual movie ID.
-       *
-       * Example:
-       *
-       * Tom Cruise
-       * Michelle Monaghan
-       *
-       * Both have:
-       * Mission: Impossible - Fallout
-       *
-       * Therefore:
-       *
-       * Tom Cruise
-       *       ↓
-       * Mission: Impossible - Fallout
-       *       ↓
-       * Michelle Monaghan
-       *
-       * Distance = 1
-       */
-
-      const startMovies =
-        await getPersonMovies(start.id);
-
-      const targetMovies =
-        await getPersonMovies(target.id);
-
-      /*
-       * Use movie ID as the primary match.
-       */
-      const targetMovieIds =
-        new Set(
-          targetMovies.map(
-            (movie) => String(movie.id)
-          )
-        );
-
-      const directMovie =
-        startMovies.find(
-          (movie) =>
-            targetMovieIds.has(
-              String(movie.id)
-            )
-        );
-
-      if (directMovie) {
-        return res.status(200).json({
-          from: start,
-          to: target,
-          distance: 1,
+      }
+      // ----------------------------------------------------------
+      // BFS
+      // ----------------------------------------------------------
+      const queue = [
+        {
+          actor: start,
           path: [
             {
-              person: {
-                id: start.id,
-                name: start.name
-              },
+              person: start,
               movie: null
-            },
-            {
-              person: {
-                id: target.id,
-                name: target.name
-              },
-              movie: {
-                id: directMovie.id,
-                title: directMovie.title,
-                year: (
-                  directMovie.release_date || ""
-                ).slice(0, 4)
-              }
             }
           ]
-        });
-      }
-
-      /*
-       * ============================================================
-       * FALLBACK DIRECT MATCH BY TITLE
-       * ============================================================
-       *
-       * Occasionally TMDB data can contain duplicate or slightly
-       * different credit records for the same movie.
-       *
-       * So we also compare normalized movie titles.
-       */
-
-      const normalizeTitle = (title) =>
-        String(title || "")
-          .toLowerCase()
-          .replace(/[^a-z0-9]/g, "");
-
-      const targetTitleMap = new Map();
-
-      for (const movie of targetMovies) {
-        const key =
-          normalizeTitle(movie.title);
-
-        if (key) {
-          targetTitleMap.set(
-            key,
-            movie
-          );
         }
-      }
-
-      const titleMatch =
-        startMovies.find((movie) =>
-          targetTitleMap.has(
-            normalizeTitle(movie.title)
-          )
+      ];
+      const visited = new Set([start.id]);
+      let answer = null;
+      while (queue.length > 0 && !answer) {
+        const current = queue.shift();
+        const currentDistance =
+          current.path.length - 1;
+        if (currentDistance >= 6) {
+          continue;
+        }
+        const movies = await getMovies(
+          current.actor.id
         );
-
-      if (titleMatch) {
-        const matchedMovie =
-          targetTitleMap.get(
-            normalizeTitle(titleMatch.title)
-          );
-
-        return res.status(200).json({
-          from: start,
-          to: target,
-          distance: 1,
-          path: [
-            {
-              person: {
-                id: start.id,
-                name: start.name
-              },
-              movie: null
-            },
-            {
-              person: {
-                id: target.id,
-                name: target.name
-              },
-              movie: {
-                id:
-                  matchedMovie.id ||
-                  titleMatch.id,
-                title:
-                  titleMatch.title,
-                year: (
-                  titleMatch.release_date ||
-                  matchedMovie.release_date ||
-                  ""
-                ).slice(0, 4)
-              }
+        for (const movie of movies.slice(0, 75)) {
+          const cast = await getCast(movie.id);
+          for (const person of cast) {
+            if (person.id === current.actor.id) {
+              continue;
             }
-          ]
-        });
-      }
-
-      /*
-       * ============================================================
-       * BIDIRECTIONAL BREADTH-FIRST SEARCH
-       * ============================================================
-       */
-
-      let frontierA = [
-        {
-          id: start.id,
-          name: start.name
-        }
-      ];
-
-      let frontierB = [
-        {
-          id: target.id,
-          name: target.name
-        }
-      ];
-
-      const visitedA =
-        new Set([start.id]);
-
-      const visitedB =
-        new Set([target.id]);
-
-      const parentA = new Map();
-      const parentB = new Map();
-
-      let depthA = 0;
-      let depthB = 0;
-
-      let meetingId = null;
-
-      /*
-       * Expand one side of the graph.
-       */
-      const expand = async (
-        frontier,
-        visited,
-        parents
-      ) => {
-        const next = [];
-
-        for (const actor of frontier) {
-          const movies =
-            await getPersonMovies(actor.id);
-
-          /*
-           * Keep the search practical.
-           */
-          const selectedMovies =
-            movies.slice(0, 100);
-
-          /*
-           * Process movies in batches.
-           */
-          for (
-            let i = 0;
-            i < selectedMovies.length;
-            i += 10
-          ) {
-            const batch =
-              selectedMovies.slice(
-                i,
-                i + 10
-              );
-
-            const casts =
-              await Promise.all(
-                batch.map((movie) =>
-                  getMovieCast(movie.id)
-                )
-              );
-
-            for (
-              let j = 0;
-              j < casts.length;
-              j++
-            ) {
-              const movie = batch[j];
-              const cast = casts[j];
-
-              for (const person of cast) {
-                /*
-                 * Never connect an actor to themselves.
-                 */
-                if (
-                  person.id === actor.id
-                ) {
-                  continue;
-                }
-
-                /*
-                 * Don't revisit an actor on the
-                 * same side.
-                 */
-                if (
-                  visited.has(person.id)
-                ) {
-                  continue;
-                }
-
-                visited.add(person.id);
-
-                parents.set(
-                  person.id,
-                  {
-                    previous:
-                      actor.id,
-                    movie: {
-                      id: movie.id,
-                      title: movie.title,
-                      year: (
-                        movie.release_date ||
-                        ""
-                      ).slice(0, 4)
-                    }
-                  }
-                );
-
-                next.push({
-                  id: person.id,
-                  name: person.name
-                });
-              }
+            if (visited.has(person.id)) {
+              continue;
             }
-          }
-        }
-
-        return next;
-      };
-
-      /*
-       * Search up to six degrees.
-       */
-      while (
-        !meetingId &&
-        depthA + depthB < 6 &&
-        frontierA.length > 0 &&
-        frontierB.length > 0
-      ) {
-        /*
-         * Expand the smaller frontier.
-         */
-        if (
-          frontierA.length <=
-          frontierB.length
-        ) {
-          frontierA =
-            await expand(
-              frontierA,
-              visitedA,
-              parentA
-            );
-
-          depthA++;
-
-          for (const actor of frontierA) {
-            if (
-              visitedB.has(actor.id)
-            ) {
-              meetingId =
-                actor.id;
+            visited.add(person.id);
+            const nextPerson = {
+              id: person.id,
+              name: person.name
+            };
+            const nextPath = [
+              ...current.path,
+              {
+                person: nextPerson,
+                movie: {
+                  id: movie.id,
+                  title: movie.title,
+                  year: movie.year
+                }
+              }
+            ];
+            if (person.id === target.id) {
+              answer = nextPath;
               break;
             }
-          }
-        } else {
-          frontierB =
-            await expand(
-              frontierB,
-              visitedB,
-              parentB
-            );
-
-          depthB++;
-
-          for (const actor of frontierB) {
-            if (
-              visitedA.has(actor.id)
-            ) {
-              meetingId =
-                actor.id;
-              break;
+            if (nextPath.length - 1 < 6) {
+              queue.push({
+                actor: nextPerson,
+                path: nextPath
+              });
             }
+          }
+          if (answer) {
+            break;
           }
         }
       }
-
-      /*
-       * ============================================================
-       * NO CONNECTION
-       * ============================================================
-       */
-
-      if (!meetingId) {
+      // ----------------------------------------------------------
+      // RESULT
+      // ----------------------------------------------------------
+      if (!answer) {
         return res.status(404).json({
           error:
-            "No connection found within six degrees.",
+            "No movie connection found within six degrees.",
           path: []
         });
       }
-
-      /*
-       * ============================================================
-       * RECONSTRUCT LEFT SIDE
-       * ============================================================
-       */
-
-      const left = [];
-
-      let cursor = meetingId;
-
-      while (
-        cursor !== start.id
-      ) {
-        const edge =
-          parentA.get(cursor);
-
-        if (!edge) {
-          return res.status(404).json({
-            error:
-              "Connection reconstruction failed.",
-            path: []
-          });
-        }
-
-        left.push({
-          id: cursor,
-          movie: edge.movie
-        });
-
-        cursor =
-          edge.previous;
-      }
-
-      left.push({
-        id: start.id,
-        movie: null
-      });
-
-      left.reverse();
-
-      /*
-       * ============================================================
-       * RECONSTRUCT RIGHT SIDE
-       * ============================================================
-       */
-
-      const right = [];
-
-      cursor = meetingId;
-
-      while (
-        cursor !== target.id
-      ) {
-        const edge =
-          parentB.get(cursor);
-
-        if (!edge) {
-          return res.status(404).json({
-            error:
-              "Connection reconstruction failed.",
-            path: []
-          });
-        }
-
-        right.push({
-          id: cursor,
-          movie: edge.movie
-        });
-
-        cursor =
-          edge.previous;
-      }
-
-      right.push({
-        id: target.id,
-        movie: null
-      });
-
-      right.reverse();
-
-      /*
-       * Combine the two sides.
-       *
-       * The meeting actor appears on both sides,
-       * so remove it from the second side.
-       */
-      const combined = [
-        ...left,
-        ...right.slice(1)
-      ];
-
-      /*
-       * ============================================================
-       * REMOVE ANY DUPLICATE ACTORS
-       * ============================================================
-       */
-
-      const seen = new Set();
-
-      const cleanPath = [];
-
-      for (const node of combined) {
-        if (
-          seen.has(node.id)
-        ) {
-          continue;
-        }
-
-        seen.add(node.id);
-        cleanPath.push(node);
-      }
-
-      /*
-       * ============================================================
-       * GET ACTOR NAMES
-       * ============================================================
-       */
-
-      const names = new Map([
-        [start.id, start.name],
-        [target.id, target.name]
-      ]);
-
-      for (const node of cleanPath) {
-        if (
-          names.has(node.id)
-        ) {
-          continue;
-        }
-
-        try {
-          const data =
-            await tmdb(
-              `/person/${node.id}?language=en-US`
-            );
-
-          names.set(
-            node.id,
-            data.name ||
-              String(node.id)
-          );
-        } catch {
-          names.set(
-            node.id,
-            String(node.id)
-          );
-        }
-      }
-
-      /*
-       * ============================================================
-       * FINAL PATH
-       * ============================================================
-       */
-
-      const path =
-        cleanPath.map(
-          (node, index) => ({
-            person: {
-              id: node.id,
-              name:
-                names.get(node.id) ||
-                String(node.id)
-            },
-            movie:
-              index === 0
-                ? null
-                : node.movie || null
-          })
-        );
-
       return res.status(200).json({
         from: start,
         to: target,
-        distance:
-          Math.max(
-            0,
-            path.length - 1
-          ),
-        path
+        distance: answer.length - 1,
+        path: answer
       });
     }
-
     /*
      * ============================================================
      * NORMAL REELWISE SEARCH
      * ============================================================
      */
-
-    let url;
-
-    if (
-      type === "movie" &&
-      id
-    ) {
-      url =
+    let endpoint;
+    if (type === "movie" && id) {
+      endpoint =
         `/movie/${id}` +
         `?language=en-US` +
         `&append_to_response=credits`;
-    } else if (
-      type === "person" &&
-      id
-    ) {
-      url =
+    } else if (type === "person" && id) {
+      endpoint =
         `/person/${id}` +
         `?language=en-US` +
         `&append_to_response=combined_credits`;
     } else if (q) {
-      url =
-        `/search/multi?query=` +
-        `${encodeURIComponent(q)}` +
+      endpoint =
+        `/search/multi?query=${encodeURIComponent(q)}` +
         `&include_adult=false` +
         `&language=en-US&page=1`;
     } else {
       return res.status(400).json({
-        error:
-          "Missing search query or ID"
+        error: "Missing search query."
       });
     }
-
-    const data =
-      await tmdb(url);
-
+    const data = await tmdb(endpoint);
     return res.status(200).json(data);
-
   } catch (error) {
-    console.error(error);
-
+    console.error("REELWISE ERROR:", error);
     return res.status(500).json({
       error:
-        error.message ||
-        "Unable to connect to TMDB"
+        error && error.message
+          ? error.message
+          : "Reelwise encountered an error."
     });
   }
 }
