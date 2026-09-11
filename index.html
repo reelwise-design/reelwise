@@ -789,7 +789,7 @@ async function searchAndOpenMovie(title){
 
   try{
     const response = await fetch(
-      `/api/search?query=${encodeURIComponent(title)}`
+      `/api/search?q=${encodeURIComponent(title)}`
     );
 
     const data = await response.json();
@@ -824,7 +824,7 @@ async function performSearch(query){
   try{
 
     const response = await fetch(
-      `/api/search?query=${encodeURIComponent(query)}`
+      `/api/search?q=${encodeURIComponent(query)}`
     );
 
     const data = await response.json();
