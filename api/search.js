@@ -1,261 +1,421 @@
-export default async function handler(req, res) {
-  const token = process.env.TMDB_READ_ACCESS_TOKEN;
+const TOKEN = process.env.TMDB_READ_ACCESS_TOKEN;
 
-  if (!token) {
-    return res.status(500).json({
-      error: "TMDB API token is not configured."
-    });
+async function tmdb(endpoint) {
+  if (!TOKEN) {
+    throw new Error("TMDB_READ_ACCESS_TOKEN is not configured.");
   }
 
-  const { q, type, id, from, to } = req.query;
+  const response = await fetch(`https://api.themoviedb.org/3${endpoint}`, {
+    headers: {
+      Authorization: `Bearer ${TOKEN}`,
+      accept: "application/json",
+    },
+  });
 
-  async function tmdb(endpoint) {
-    const response = await fetch(
-      `https://api.themoviedb.org/3${endpoint}`,
-      {
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json"
+  const data = await response.json();
+
+  if (!response.ok) {
+    throw new Error(data.status_message || "TMDB request failed.");
+  }
+
+  return data;
+}
+
+function cleanName(name) {
+  return String(name || "").trim();
+}
+
+function yearFromDate(date) {
+  return date ? String(date).slice(0, 4) : "";
+}
+
+async function findActor(name) {
+  const q = cleanName(name);
+
+  if (!q) {
+    throw new Error("Actor name is required.");
+  }
+
+  const data = await tmdb(
+    `/search/person?query=${encodeURIComponent(q)}&language=en-US&include_adult=false`
+  );
+
+  const people = Array.isArray(data.results) ? data.results : [];
+
+  const actor = people.find((person) =>
+    Array.isArray(person.known_for_department)
+      ? person.known_for_department.includes("Acting")
+      : person.known_for_department === "Acting"
+  ) || people[0];
+
+  if (!actor) {
+    throw new Error(`Could not find actor "${q}".`);
+  }
+
+  return actor;
+}
+
+async function getMovieCredits(personId) {
+  const data = await tmdb(
+    `/person/${personId}/movie_credits?language=en-US`
+  );
+
+  return Array.isArray(data.cast) ? data.cast : [];
+}
+
+async function getMovieCast(movieId) {
+  const data = await tmdb(
+    `/movie/${movieId}/credits?language=en-US`
+  );
+
+  return Array.isArray(data.cast) ? data.cast : [];
+}
+
+function movieInfo(movie) {
+  return {
+    id: movie.id,
+    title: movie.title || movie.original_title || "Untitled",
+    year: yearFromDate(movie.release_date),
+  };
+}
+
+function sortMovies(movies) {
+  return [...movies].sort((a, b) => {
+    const popularityA = Number(a.popularity || 0);
+    const popularityB = Number(b.popularity || 0);
+
+    if (popularityA !== popularityB) {
+      return popularityB - popularityA;
+    }
+
+    const votesA = Number(a.vote_count || 0);
+    const votesB = Number(b.vote_count || 0);
+
+    return votesB - votesA;
+  });
+}
+
+function makePathActor(person) {
+  return {
+    person: {
+      id: person.id,
+      name: person.name,
+    },
+  };
+}
+
+function makePathStep(person, movie) {
+  return {
+    person: {
+      id: person.id,
+      name: person.name,
+    },
+    movie: movieInfo(movie),
+  };
+}
+
+async function findSixDegrees(fromName, toName) {
+  const from = await findActor(fromName);
+  const to = await findActor(toName);
+
+  if (from.id === to.id) {
+    return {
+      from: {
+        id: from.id,
+        name: from.name,
+      },
+      to: {
+        id: to.id,
+        name: to.name,
+      },
+      distance: 0,
+      path: [makePathActor(from)],
+    };
+  }
+
+  const fromCredits = await getMovieCredits(from.id);
+
+  const movieCache = new Map();
+  const personCreditCache = new Map();
+
+  personCreditCache.set(from.id, fromCredits);
+
+  async function getCachedCredits(personId) {
+    if (!personCreditCache.has(personId)) {
+      personCreditCache.set(personId, await getMovieCredits(personId));
+    }
+
+    return personCreditCache.get(personId);
+  }
+
+  async function getCachedCast(movieId) {
+    if (!movieCache.has(movieId)) {
+      movieCache.set(movieId, await getMovieCast(movieId));
+    }
+
+    return movieCache.get(movieId);
+  }
+
+  // First check for a direct connection.
+  const directMovies = fromCredits.filter((movie) =>
+    Number.isFinite(Number(movie.id))
+  );
+
+  for (const movie of sortMovies(directMovies)) {
+    const cast = await getCachedCast(movie.id);
+
+    if (cast.some((person) => person.id === to.id)) {
+      return {
+        from: {
+          id: from.id,
+          name: from.name,
+        },
+        to: {
+          id: to.id,
+          name: to.name,
+        },
+        distance: 1,
+        path: [
+          makePathActor(from),
+          makePathStep(to, movie),
+        ],
+      };
+    }
+  }
+
+  /*
+    Breadth-first search.
+
+    Each level represents one movie connection.
+
+    Example:
+
+    Tom Cruise
+       ↓ Top Gun
+    Val Kilmer
+       ↓ Heat
+    Robert De Niro
+
+    Distance = 2
+  */
+
+  const queue = [];
+
+  queue.push({
+    actor: from,
+    distance: 0,
+    path: [makePathActor(from)],
+  });
+
+  const visited = new Set([from.id]);
+
+  const MAX_DEGREES = 6;
+
+  while (queue.length > 0) {
+    const current = queue.shift();
+
+    if (current.distance >= MAX_DEGREES) {
+      continue;
+    }
+
+    const credits = await getCachedCredits(current.actor.id);
+
+    /*
+      We don't impose a year restriction.
+      We simply prioritize more prominent movies so the search
+      has a reasonable chance of completing within Vercel's limits.
+    */
+    const movies = sortMovies(credits)
+      .filter((movie) => movie && movie.id)
+      .slice(0, 50);
+
+    for (const movie of movies) {
+      const cast = await getCachedCast(movie.id);
+
+      /*
+        Put the target first so we can immediately finish
+        if the target appears in this movie.
+      */
+      const orderedCast = [...cast].sort((a, b) => {
+        if (a.id === to.id) return -1;
+        if (b.id === to.id) return 1;
+
+        const popularityA = Number(a.popularity || 0);
+        const popularityB = Number(b.popularity || 0);
+
+        return popularityB - popularityA;
+      });
+
+      for (const person of orderedCast) {
+        if (!person || !person.id || !person.name) {
+          continue;
         }
-      }
-    );
 
-    if (!response.ok) {
-      throw new Error(`TMDB request failed: ${response.status}`);
-    }
+        const nextDistance = current.distance + 1;
 
-    return response.json();
-  }
-
-  function clean(value) {
-    return String(value || "")
-      .toLowerCase()
-      .replace(/[^a-z0-9]/g, "");
-  }
-
-  async function findActor(name) {
-    const data = await tmdb(
-      `/search/person?query=${encodeURIComponent(name)}&language=en-US`
-    );
-
-    const results = data.results || [];
-
-    if (!results.length) {
-      return null;
-    }
-
-    const exact = results.find(
-      person =>
-        person.name &&
-        person.name.toLowerCase() === name.toLowerCase()
-    );
-
-    return exact || results[0];
-  }
-
-  async function getMovieCredits(personId) {
-    const data = await tmdb(
-      `/person/${personId}/movie_credits?language=en-US`
-    );
-
-    return (data.cast || []).filter(movie => {
-      const character = String(
-        movie.character || ""
-      ).toLowerCase();
-
-      if (!character) return false;
-
-      if (
-        character.includes("self") ||
-        character.includes("archive")
-      ) {
-        return false;
-      }
-
-      return true;
-    });
-  }
-
-  function findSharedMovie(creditsA, creditsB) {
-    const movieIds = new Set(
-      creditsB.map(movie => movie.id)
-    );
-
-    const direct = creditsA.find(movie =>
-      movieIds.has(movie.id)
-    );
-
-    if (direct) {
-      return direct;
-    }
-
-    const movieTitles = new Set(
-      creditsB.map(movie => clean(movie.title))
-    );
-
-    return (
-      creditsA.find(movie =>
-        movieTitles.has(clean(movie.title))
-      ) || null
-    );
-  }
-
-  /*
-   * SIX DEGREES
-   *
-   * For now we establish the direct connection
-   * using TMDB's official movie credits.
-   */
-
-  if (type === "degrees") {
-    try {
-      if (!from || !to) {
-        return res.status(400).json({
-          error: "Enter two actors."
-        });
-      }
-
-      const [actorA, actorB] = await Promise.all([
-        findActor(from),
-        findActor(to)
-      ]);
-
-      if (!actorA) {
-        return res.status(404).json({
-          error: `Actor "${from}" was not found.`
-        });
-      }
-
-      if (!actorB) {
-        return res.status(404).json({
-          error: `Actor "${to}" was not found.`
-        });
-      }
-
-      if (actorA.id === actorB.id) {
-        return res.status(400).json({
-          error: "Choose two different actors."
-        });
-      }
-
-      const [creditsA, creditsB] = await Promise.all([
-        getMovieCredits(actorA.id),
-        getMovieCredits(actorB.id)
-      ]);
-
-      const sharedMovie = findSharedMovie(
-        creditsA,
-        creditsB
-      );
-
-      if (sharedMovie) {
-        return res.status(200).json({
-          from: {
-            id: actorA.id,
-            name: actorA.name
-          },
-
-          to: {
-            id: actorB.id,
-            name: actorB.name
-          },
-
-          distance: 1,
-
-          path: [
-            {
-              person: {
-                id: actorA.id,
-                name: actorA.name
-              }
+        if (person.id === to.id) {
+          return {
+            from: {
+              id: from.id,
+              name: from.name,
             },
+            to: {
+              id: to.id,
+              name: to.name,
+            },
+            distance: nextDistance,
+            path: [
+              ...current.path,
+              makePathStep(to, movie),
+            ],
+          };
+        }
 
-            {
-              person: {
-                id: actorB.id,
-                name: actorB.name
-              },
+        if (nextDistance >= MAX_DEGREES) {
+          continue;
+        }
 
-              movie: {
-                id: sharedMovie.id,
-                title: sharedMovie.title,
-                year: sharedMovie.release_date
-                  ? sharedMovie.release_date.substring(0, 4)
-                  : ""
-              }
-            }
-          ]
+        if (visited.has(person.id)) {
+          continue;
+        }
+
+        visited.add(person.id);
+
+        queue.push({
+          actor: {
+            id: person.id,
+            name: person.name,
+          },
+          distance: nextDistance,
+          path: [
+            ...current.path,
+            makePathStep(person, movie),
+          ],
         });
       }
-
-      return res.status(404).json({
-        error:
-          `No direct movie connection found between ${actorA.name} and ${actorB.name}.`
-      });
-
-    } catch (error) {
-      console.error("Six Degrees error:", error);
-
-      return res.status(500).json({
-        error: error.message || "Six Degrees search failed."
-      });
     }
   }
 
-  /*
-   * NORMAL REELWISE SEARCH
-   */
+  throw new Error(
+    `No movie connection found between ${from.name} and ${to.name} within six films.`
+  );
+}
 
+function sendError(res, status, message) {
+  return res.status(status).json({
+    error: message,
+  });
+}
+
+export default async function handler(req, res) {
   try {
-    if (type === "movie") {
+    const query = req.query || {};
+    const type = query.type;
+    const q = cleanName(query.q);
+    const id = query.id;
+
+    /*
+      SIX DEGREES
+    */
+    if (type === "degrees") {
+      const from = cleanName(query.from);
+      const to = cleanName(query.to);
+
+      if (!from || !to) {
+        return sendError(
+          res,
+          400,
+          "Please provide two actor names."
+        );
+      }
+
+      const result = await findSixDegrees(from, to);
+
+      return res.status(200).json(result);
+    }
+
+    /*
+      MOVIE DETAILS
+    */
+    if (type === "movie-details" || (type === "movie" && id)) {
       return res.status(200).json(
-        await tmdb(
-          `/search/movie?query=${encodeURIComponent(
-            q || ""
-          )}&language=en-US`
-        )
+        await tmdb(`/movie/${encodeURIComponent(id)}?language=en-US`)
       );
     }
 
+    /*
+      PERSON DETAILS
+    */
+    if (type === "person-details" || (type === "person" && id)) {
+      const person = await tmdb(
+        `/person/${encodeURIComponent(id)}?language=en-US`
+      );
+
+      const credits = await tmdb(
+        `/person/${encodeURIComponent(id)}/combined_credits?language=en-US`
+      );
+
+      return res.status(200).json({
+        ...person,
+        credits,
+      });
+    }
+
+    /*
+      MOVIE SEARCH
+    */
+    if (type === "movie") {
+      const data = await tmdb(
+        `/search/movie?query=${encodeURIComponent(
+          q || ""
+        )}&language=en-US&include_adult=false`
+      );
+
+      return res.status(200).json(data);
+    }
+
+    /*
+      PERSON SEARCH
+    */
     if (type === "person") {
       return res.status(200).json(
         await tmdb(
           `/search/person?query=${encodeURIComponent(
             q || ""
-          )}&language=en-US`
+          )}&language=en-US&include_adult=false`
         )
       );
     }
 
-    if (type === "movie-details") {
-      return res.status(200).json(
-        await tmdb(
-          `/movie/${id}?language=en-US&append_to_response=credits`
-        )
-      );
-    }
+    /*
+      DEFAULT SEARCH
+    */
+    const searchTerm = q || "";
 
-    if (type === "person-details") {
-      return res.status(200).json(
-        await tmdb(
-          `/person/${id}?language=en-US&append_to_response=combined_credits`
-        )
-      );
-    }
+    const [movies, people] = await Promise.all([
+      tmdb(
+        `/search/movie?query=${encodeURIComponent(
+          searchTerm
+        )}&language=en-US&include_adult=false`
+      ),
+      tmdb(
+        `/search/person?query=${encodeURIComponent(
+          searchTerm
+        )}&language=en-US&include_adult=false`
+      ),
+    ]);
 
-    return res.status(200).json(
-      await tmdb(
-        `/search/multi?query=${encodeURIComponent(
-          q || ""
-        )}&language=en-US`
-      )
-    );
-
-  } catch (error) {
-    console.error("Reelwise search error:", error);
-
-    return res.status(500).json({
-      error: "Search failed."
+    return res.status(200).json({
+      movies: movies.results || [],
+      people: people.results || [],
     });
+  } catch (error) {
+    console.error("Reelwise API error:", error);
+
+    return sendError(
+      res,
+      500,
+      error?.message || "Something went wrong."
+    );
   }
 }
