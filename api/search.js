@@ -29,13 +29,6 @@ function yearFromDate(date) {
   return date ? String(date).slice(0, 4) : "";
 }
 
-/*
-  Find the best TMDB person match.
-
-  We strongly prefer an exact name match and an actor
-  whose department is Acting. This prevents unrelated
-  people with similar names from entering the graph.
-*/
 async function findActor(name) {
   const q = cleanName(name);
 
@@ -44,9 +37,7 @@ async function findActor(name) {
   }
 
   const data = await tmdb(
-    `/search/person?query=${encodeURIComponent(
-      q
-    )}&language=en-US&include_adult=false`
+    `/search/person?query=${encodeURIComponent(q)}&language=en-US&include_adult=false`
   );
 
   const people = Array.isArray(data.results) ? data.results : [];
@@ -58,25 +49,21 @@ async function findActor(name) {
   const normalized = q.toLowerCase();
 
   const exact = people.filter(
-    (person) =>
+    person =>
       String(person.name || "").trim().toLowerCase() === normalized
   );
 
   const actingExact = exact.find(
-    (person) => person.known_for_department === "Acting"
+    person => person.known_for_department === "Acting"
   );
 
-  if (actingExact) {
-    return actingExact;
-  }
+  if (actingExact) return actingExact;
 
   const acting = people.find(
-    (person) => person.known_for_department === "Acting"
+    person => person.known_for_department === "Acting"
   );
 
-  if (acting) {
-    return acting;
-  }
+  if (acting) return acting;
 
   return exact[0] || people[0];
 }
@@ -175,16 +162,14 @@ async function findSixDegrees(fromName, toName) {
 
   async function getCachedCast(movieId) {
     if (!movieCache.has(movieId)) {
-      movieCache.set(movieId, await getMovieCast(movieId));
+      movieCache.set(
+        movieId,
+        await getMovieCast(movieId)
+      );
     }
 
     return movieCache.get(movieId);
   }
-
-  /*
-    Breadth-first search guarantees that the first
-    connection found is the shortest connection.
-  */
 
   const queue = [
     {
@@ -195,7 +180,6 @@ async function findSixDegrees(fromName, toName) {
   ];
 
   const visited = new Set([from.id]);
-
   const MAX_DEGREES = 6;
 
   while (queue.length > 0) {
@@ -207,26 +191,15 @@ async function findSixDegrees(fromName, toName) {
 
     const credits = await getCachedCredits(current.actor.id);
 
-    /*
-      Use the actor's strongest/popular movie credits first.
-      This keeps TMDB calls manageable while still finding
-      the overwhelming majority of useful connections.
-    */
     const movies = sortMovies(
-      credits.filter((movie) => movie && movie.id)
+      credits.filter(movie => movie && movie.id)
     ).slice(0, 50);
 
     for (const movie of movies) {
       const cast = await getCachedCast(movie.id);
 
-      /*
-        Look for the destination actor first.
-        This prevents an unrelated popular actor from
-        being selected when the requested actor is actually
-        in the movie.
-      */
       const destination = cast.find(
-        (person) => person && person.id === to.id
+        person => person && person.id === to.id
       );
 
       if (destination) {
@@ -249,9 +222,6 @@ async function findSixDegrees(fromName, toName) {
         };
       }
 
-      /*
-        Add other actors to the search queue.
-      */
       const orderedCast = [...cast].sort((a, b) => {
         return (
           Number(b.popularity || 0) -
@@ -278,11 +248,6 @@ async function findSixDegrees(fromName, toName) {
           continue;
         }
 
-        /*
-          Only allow people who TMDB identifies as actors.
-          This is the important safeguard against people such
-          as producers, writers, crew members, etc.
-        */
         if (
           person.known_for_department &&
           person.known_for_department !== "Acting"
@@ -326,6 +291,7 @@ export default async function handler(req, res) {
     const q = cleanName(query.q);
     const id = query.id;
 
+    // SIX DEGREES
     if (type === "degrees") {
       const from = cleanName(query.from);
       const to = cleanName(query.to);
@@ -343,33 +309,29 @@ export default async function handler(req, res) {
       return res.status(200).json(result);
     }
 
+    // MOVIE DETAILS
     if (
       type === "movie-details" ||
       (type === "movie" && id)
     ) {
       return res.status(200).json(
         await tmdb(
-          `/movie/${encodeURIComponent(
-            id
-          )}?language=en-US`
+          `/movie/${encodeURIComponent(id)}?language=en-US`
         )
       );
     }
 
+    // PERSON DETAILS
     if (
       type === "person-details" ||
       (type === "person" && id)
     ) {
       const person = await tmdb(
-        `/person/${encodeURIComponent(
-          id
-        )}?language=en-US`
+        `/person/${encodeURIComponent(id)}?language=en-US`
       );
 
       const credits = await tmdb(
-        `/person/${encodeURIComponent(
-          id
-        )}/combined_credits?language=en-US`
+        `/person/${encodeURIComponent(id)}/combined_credits?language=en-US`
       );
 
       return res.status(200).json({
@@ -378,44 +340,73 @@ export default async function handler(req, res) {
       });
     }
 
+    // MOVIE-ONLY SEARCH
     if (type === "movie") {
       return res.status(200).json(
         await tmdb(
-          `/search/movie?query=${encodeURIComponent(
-            q
-          )}&language=en-US&include_adult=false`
+          `/search/movie?query=${encodeURIComponent(q)}&language=en-US&include_adult=false`
         )
       );
     }
 
+    // PERSON-ONLY SEARCH
     if (type === "person") {
       return res.status(200).json(
         await tmdb(
-          `/search/person?query=${encodeURIComponent(
-            q
-          )}&language=en-US&include_adult=false`
+          `/search/person?query=${encodeURIComponent(q)}&language=en-US&include_adult=false`
         )
       );
     }
 
+    // MAIN REELWISE SEARCH
     const searchTerm = q || "";
 
-    const [movies, people] = await Promise.all([
+    const [movieData, personData] = await Promise.all([
       tmdb(
-        `/search/movie?query=${encodeURIComponent(
-          searchTerm
-        )}&language=en-US&include_adult=false`
+        `/search/movie?query=${encodeURIComponent(searchTerm)}&language=en-US&include_adult=false`
       ),
       tmdb(
-        `/search/person?query=${encodeURIComponent(
-          searchTerm
-        )}&language=en-US&include_adult=false`
+        `/search/person?query=${encodeURIComponent(searchTerm)}&language=en-US&include_adult=false`
       ),
     ]);
 
+    const movies = Array.isArray(movieData.results)
+      ? movieData.results
+      : [];
+
+    const people = Array.isArray(personData.results)
+      ? personData.results
+      : [];
+
+    // IMPORTANT:
+    // Create ONE combined results array for the Reelwise
+    // top search bar.
+
+    const movieResults = movies.map(movie => ({
+      ...movie,
+      result_type: "movie",
+      display_title:
+        movie.title ||
+        movie.original_title ||
+        "Untitled",
+      year: yearFromDate(movie.release_date),
+    }));
+
+    const personResults = people.map(person => ({
+      ...person,
+      result_type: "person",
+      display_title: person.name || "Unknown",
+    }));
+
+    const results = [
+      ...movieResults,
+      ...personResults,
+    ];
+
     return res.status(200).json({
-      movies: movies.results || [],
-      people: people.results || [],
+      results,
+      movies,
+      people,
     });
   } catch (error) {
     console.error("Reelwise API error:", error);
