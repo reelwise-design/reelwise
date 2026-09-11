@@ -29,6 +29,13 @@ function yearFromDate(date) {
   return date ? String(date).slice(0, 4) : "";
 }
 
+/*
+  Find the best TMDB person match.
+
+  We strongly prefer an exact name match and an actor
+  whose department is Acting. This prevents unrelated
+  people with similar names from entering the graph.
+*/
 async function findActor(name) {
   const q = cleanName(name);
 
@@ -37,22 +44,41 @@ async function findActor(name) {
   }
 
   const data = await tmdb(
-    `/search/person?query=${encodeURIComponent(q)}&language=en-US&include_adult=false`
+    `/search/person?query=${encodeURIComponent(
+      q
+    )}&language=en-US&include_adult=false`
   );
 
   const people = Array.isArray(data.results) ? data.results : [];
 
-  const actor = people.find((person) =>
-    Array.isArray(person.known_for_department)
-      ? person.known_for_department.includes("Acting")
-      : person.known_for_department === "Acting"
-  ) || people[0];
-
-  if (!actor) {
+  if (!people.length) {
     throw new Error(`Could not find actor "${q}".`);
   }
 
-  return actor;
+  const normalized = q.toLowerCase();
+
+  const exact = people.filter(
+    (person) =>
+      String(person.name || "").trim().toLowerCase() === normalized
+  );
+
+  const actingExact = exact.find(
+    (person) => person.known_for_department === "Acting"
+  );
+
+  if (actingExact) {
+    return actingExact;
+  }
+
+  const acting = people.find(
+    (person) => person.known_for_department === "Acting"
+  );
+
+  if (acting) {
+    return acting;
+  }
+
+  return exact[0] || people[0];
 }
 
 async function getMovieCredits(personId) {
@@ -88,10 +114,10 @@ function sortMovies(movies) {
       return popularityB - popularityA;
     }
 
-    const votesA = Number(a.vote_count || 0);
-    const votesB = Number(b.vote_count || 0);
-
-    return votesB - votesA;
+    return (
+      Number(b.vote_count || 0) -
+      Number(a.vote_count || 0)
+    );
   });
 }
 
@@ -133,16 +159,15 @@ async function findSixDegrees(fromName, toName) {
     };
   }
 
-  const fromCredits = await getMovieCredits(from.id);
-
   const movieCache = new Map();
   const personCreditCache = new Map();
 
-  personCreditCache.set(from.id, fromCredits);
-
   async function getCachedCredits(personId) {
     if (!personCreditCache.has(personId)) {
-      personCreditCache.set(personId, await getMovieCredits(personId));
+      personCreditCache.set(
+        personId,
+        await getMovieCredits(personId)
+      );
     }
 
     return personCreditCache.get(personId);
@@ -156,56 +181,18 @@ async function findSixDegrees(fromName, toName) {
     return movieCache.get(movieId);
   }
 
-  // First check for a direct connection.
-  const directMovies = fromCredits.filter((movie) =>
-    Number.isFinite(Number(movie.id))
-  );
-
-  for (const movie of sortMovies(directMovies)) {
-    const cast = await getCachedCast(movie.id);
-
-    if (cast.some((person) => person.id === to.id)) {
-      return {
-        from: {
-          id: from.id,
-          name: from.name,
-        },
-        to: {
-          id: to.id,
-          name: to.name,
-        },
-        distance: 1,
-        path: [
-          makePathActor(from),
-          makePathStep(to, movie),
-        ],
-      };
-    }
-  }
-
   /*
-    Breadth-first search.
-
-    Each level represents one movie connection.
-
-    Example:
-
-    Tom Cruise
-       ↓ Top Gun
-    Val Kilmer
-       ↓ Heat
-    Robert De Niro
-
-    Distance = 2
+    Breadth-first search guarantees that the first
+    connection found is the shortest connection.
   */
 
-  const queue = [];
-
-  queue.push({
-    actor: from,
-    distance: 0,
-    path: [makePathActor(from)],
-  });
+  const queue = [
+    {
+      actor: from,
+      distance: 0,
+      path: [makePathActor(from)],
+    },
+  ];
 
   const visited = new Set([from.id]);
 
@@ -221,29 +208,55 @@ async function findSixDegrees(fromName, toName) {
     const credits = await getCachedCredits(current.actor.id);
 
     /*
-      We don't impose a year restriction.
-      We simply prioritize more prominent movies so the search
-      has a reasonable chance of completing within Vercel's limits.
+      Use the actor's strongest/popular movie credits first.
+      This keeps TMDB calls manageable while still finding
+      the overwhelming majority of useful connections.
     */
-    const movies = sortMovies(credits)
-      .filter((movie) => movie && movie.id)
-      .slice(0, 50);
+    const movies = sortMovies(
+      credits.filter((movie) => movie && movie.id)
+    ).slice(0, 50);
 
     for (const movie of movies) {
       const cast = await getCachedCast(movie.id);
 
       /*
-        Put the target first so we can immediately finish
-        if the target appears in this movie.
+        Look for the destination actor first.
+        This prevents an unrelated popular actor from
+        being selected when the requested actor is actually
+        in the movie.
+      */
+      const destination = cast.find(
+        (person) => person && person.id === to.id
+      );
+
+      if (destination) {
+        const nextDistance = current.distance + 1;
+
+        return {
+          from: {
+            id: from.id,
+            name: from.name,
+          },
+          to: {
+            id: to.id,
+            name: to.name,
+          },
+          distance: nextDistance,
+          path: [
+            ...current.path,
+            makePathStep(to, movie),
+          ],
+        };
+      }
+
+      /*
+        Add other actors to the search queue.
       */
       const orderedCast = [...cast].sort((a, b) => {
-        if (a.id === to.id) return -1;
-        if (b.id === to.id) return 1;
-
-        const popularityA = Number(a.popularity || 0);
-        const popularityB = Number(b.popularity || 0);
-
-        return popularityB - popularityA;
+        return (
+          Number(b.popularity || 0) -
+          Number(a.popularity || 0)
+        );
       });
 
       for (const person of orderedCast) {
@@ -251,31 +264,29 @@ async function findSixDegrees(fromName, toName) {
           continue;
         }
 
-        const nextDistance = current.distance + 1;
-
-        if (person.id === to.id) {
-          return {
-            from: {
-              id: from.id,
-              name: from.name,
-            },
-            to: {
-              id: to.id,
-              name: to.name,
-            },
-            distance: nextDistance,
-            path: [
-              ...current.path,
-              makePathStep(to, movie),
-            ],
-          };
+        if (person.id === from.id) {
+          continue;
         }
+
+        const nextDistance = current.distance + 1;
 
         if (nextDistance >= MAX_DEGREES) {
           continue;
         }
 
         if (visited.has(person.id)) {
+          continue;
+        }
+
+        /*
+          Only allow people who TMDB identifies as actors.
+          This is the important safeguard against people such
+          as producers, writers, crew members, etc.
+        */
+        if (
+          person.known_for_department &&
+          person.known_for_department !== "Acting"
+        ) {
           continue;
         }
 
@@ -310,13 +321,11 @@ function sendError(res, status, message) {
 export default async function handler(req, res) {
   try {
     const query = req.query || {};
+
     const type = query.type;
     const q = cleanName(query.q);
     const id = query.id;
 
-    /*
-      SIX DEGREES
-    */
     if (type === "degrees") {
       const from = cleanName(query.from);
       const to = cleanName(query.to);
@@ -334,25 +343,33 @@ export default async function handler(req, res) {
       return res.status(200).json(result);
     }
 
-    /*
-      MOVIE DETAILS
-    */
-    if (type === "movie-details" || (type === "movie" && id)) {
+    if (
+      type === "movie-details" ||
+      (type === "movie" && id)
+    ) {
       return res.status(200).json(
-        await tmdb(`/movie/${encodeURIComponent(id)}?language=en-US`)
+        await tmdb(
+          `/movie/${encodeURIComponent(
+            id
+          )}?language=en-US`
+        )
       );
     }
 
-    /*
-      PERSON DETAILS
-    */
-    if (type === "person-details" || (type === "person" && id)) {
+    if (
+      type === "person-details" ||
+      (type === "person" && id)
+    ) {
       const person = await tmdb(
-        `/person/${encodeURIComponent(id)}?language=en-US`
+        `/person/${encodeURIComponent(
+          id
+        )}?language=en-US`
       );
 
       const credits = await tmdb(
-        `/person/${encodeURIComponent(id)}/combined_credits?language=en-US`
+        `/person/${encodeURIComponent(
+          id
+        )}/combined_credits?language=en-US`
       );
 
       return res.status(200).json({
@@ -361,35 +378,26 @@ export default async function handler(req, res) {
       });
     }
 
-    /*
-      MOVIE SEARCH
-    */
     if (type === "movie") {
-      const data = await tmdb(
-        `/search/movie?query=${encodeURIComponent(
-          q || ""
-        )}&language=en-US&include_adult=false`
-      );
-
-      return res.status(200).json(data);
-    }
-
-    /*
-      PERSON SEARCH
-    */
-    if (type === "person") {
       return res.status(200).json(
         await tmdb(
-          `/search/person?query=${encodeURIComponent(
-            q || ""
+          `/search/movie?query=${encodeURIComponent(
+            q
           )}&language=en-US&include_adult=false`
         )
       );
     }
 
-    /*
-      DEFAULT SEARCH
-    */
+    if (type === "person") {
+      return res.status(200).json(
+        await tmdb(
+          `/search/person?query=${encodeURIComponent(
+            q
+          )}&language=en-US&include_adult=false`
+        )
+      );
+    }
+
     const searchTerm = q || "";
 
     const [movies, people] = await Promise.all([
