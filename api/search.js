@@ -7,13 +7,7 @@ export default async function handler(req, res) {
     });
   }
 
-  const {
-    q,
-    type,
-    id,
-    from,
-    to
-  } = req.query;
+  const { q, type, id, from, to } = req.query;
 
   async function tmdb(endpoint) {
     const response = await fetch(
@@ -33,59 +27,44 @@ export default async function handler(req, res) {
     return response.json();
   }
 
-  function isRealActingCredit(credit) {
+  async function findActor(name) {
+    const data = await tmdb(
+      `/search/person?query=${encodeURIComponent(name)}&language=en-US`
+    );
+
+    if (!data.results || data.results.length === 0) {
+      return null;
+    }
+
+    const exact = data.results.find(
+      person =>
+        person.name &&
+        person.name.toLowerCase() === name.toLowerCase()
+    );
+
+    return exact || data.results[0];
+  }
+
+  function realActingCredit(credit) {
     if (!credit) return false;
 
     const character = String(credit.character || "").toLowerCase();
 
     if (!character) return false;
 
-    const excluded = [
+    const badCredits = [
       "self",
       "himself",
       "herself",
       "themselves",
       "archive footage",
-      "archive",
-      "uncredited archive footage"
+      "archive"
     ];
 
-    return !excluded.some(word => character.includes(word));
+    return !badCredits.some(word => character.includes(word));
   }
 
-  async function findActor(name) {
-    const data = await tmdb(
-      `/search/person?query=${encodeURIComponent(name)}&language=en-US`
-    );
-
-    if (!data.results || !data.results.length) {
-      return null;
-    }
-
-    const exact = data.results.find(
-      person => person.name.toLowerCase() === name.toLowerCase()
-    );
-
-    return exact || data.results[0];
-  }
-
-  async function getMovieCredits(personId) {
-    const data = await tmdb(
-      `/person/${personId}/movie_credits?language=en-US`
-    );
-
-    return (data.cast || []).filter(isRealActingCredit);
-  }
-
-  async function getMovieCast(movieId) {
-    const data = await tmdb(
-      `/movie/${movieId}/credits?language=en-US`
-    );
-
-    return data.cast || [];
-  }
-
-  function movieInfo(movie) {
+  function movieData(movie) {
     return {
       id: movie.id,
       title: movie.title,
@@ -96,27 +75,23 @@ export default async function handler(req, res) {
   }
 
   /*
+   * =========================================================
    * SIX DEGREES
-   *
-   * First we find the two actors.
-   * Then we use the first actor's actual movie credits.
-   * For each movie, we inspect the movie's actual cast.
-   *
-   * This prevents documentaries, "Self" appearances,
-   * archive footage and other non-acting appearances
-   * from creating fake connections.
+   * =========================================================
    */
 
   if (type === "degrees") {
     try {
       if (!from || !to) {
         return res.status(400).json({
-          error: "Two actors are required."
+          error: "Enter two actors."
         });
       }
 
-      const actorA = await findActor(from);
-      const actorB = await findActor(to);
+      const [actorA, actorB] = await Promise.all([
+        findActor(from),
+        findActor(to)
+      ]);
 
       if (!actorA) {
         return res.status(404).json({
@@ -136,225 +111,211 @@ export default async function handler(req, res) {
         });
       }
 
-      const creditsA = await getMovieCredits(actorA.id);
+      /*
+       * Get both actors' movie credits AT THE SAME TIME.
+       * This is much faster than checking movies one at a time.
+       */
+
+      const [creditsAData, creditsBData] = await Promise.all([
+        tmdb(`/person/${actorA.id}/movie_credits?language=en-US`),
+        tmdb(`/person/${actorB.id}/movie_credits?language=en-US`)
+      ]);
+
+      const creditsA = (creditsAData.cast || [])
+        .filter(realActingCredit);
+
+      const creditsB = (creditsBData.cast || [])
+        .filter(realActingCredit);
 
       /*
-       * Put the most popular movies first.
-       * This makes common connections much faster.
+       * Create a lookup table for Actor B's movies.
        */
-      creditsA.sort(
-        (a, b) => (b.popularity || 0) - (a.popularity || 0)
-      );
 
-      /*
-       * Look through Actor A's movies.
-       *
-       * We limit the initial scan so the request doesn't
-       * overwhelm Vercel/TMDB.
-       */
-      const moviesToCheck = creditsA.slice(0, 100);
+      const moviesB = new Map();
 
-      for (const movie of moviesToCheck) {
-        try {
-          const cast = await getMovieCast(movie.id);
-
-          const target = cast.find(
-            person =>
-              person.id === actorB.id &&
-              isRealActingCredit(person)
-          );
-
-          if (target) {
-            return res.status(200).json({
-              from: {
-                id: actorA.id,
-                name: actorA.name
-              },
-              to: {
-                id: actorB.id,
-                name: actorB.name
-              },
-              distance: 1,
-              path: [
-                {
-                  person: {
-                    id: actorA.id,
-                    name: actorA.name
-                  }
-                },
-                {
-                  person: {
-                    id: actorB.id,
-                    name: actorB.name
-                  },
-                  movie: movieInfo(movie)
-                }
-              ]
-            });
-          }
-        } catch (movieError) {
-          /*
-           * If one movie fails, keep checking the others.
-           */
-          continue;
-        }
+      for (const movie of creditsB) {
+        moviesB.set(movie.id, movie);
       }
 
       /*
-       * If there is no direct connection, build a limited
-       * actor/movie graph for up to six degrees.
-       *
-       * We start with Actor A and expand outward.
+       * Find movies shared by both actors.
        */
 
-      const queue = [
-        {
-          person: actorA,
+      const sharedMovies = creditsA
+        .filter(movie => moviesB.has(movie.id))
+        .map(movie => ({
+          movie,
+          other: moviesB.get(movie.id)
+        }));
+
+      /*
+       * Prefer the most popular shared movie.
+       */
+
+      sharedMovies.sort(
+        (a, b) =>
+          (b.movie.popularity || 0) -
+          (a.movie.popularity || 0)
+      );
+
+      /*
+       * DIRECT CONNECTION FOUND
+       */
+
+      if (sharedMovies.length > 0) {
+        const shared = sharedMovies[0].movie;
+
+        return res.status(200).json({
+          from: {
+            id: actorA.id,
+            name: actorA.name
+          },
+
+          to: {
+            id: actorB.id,
+            name: actorB.name
+          },
+
+          distance: 1,
+
           path: [
             {
               person: {
                 id: actorA.id,
                 name: actorA.name
               }
+            },
+
+            {
+              person: {
+                id: actorB.id,
+                name: actorB.name
+              },
+
+              movie: movieData(shared)
             }
-          ],
-          distance: 0
-        }
-      ];
+          ]
+        });
+      }
 
-      const visitedActors = new Set([actorA.id]);
-      const movieCache = new Map();
+      /*
+       * =====================================================
+       * NO DIRECT CONNECTION
+       *
+       * Do a LIMITED second-level search.
+       *
+       * We use Actor A's most popular movies and look at their
+       * casts in parallel rather than sequentially.
+       * =====================================================
+       */
 
-      while (queue.length) {
-        const current = queue.shift();
+      const popularMovies = [...creditsA]
+        .sort(
+          (a, b) =>
+            (b.popularity || 0) -
+            (a.popularity || 0)
+        )
+        .slice(0, 15);
 
-        if (current.distance >= 6) {
-          continue;
-        }
+      const castResults = await Promise.all(
+        popularMovies.map(async movie => {
+          try {
+            const data = await tmdb(
+              `/movie/${movie.id}/credits?language=en-US`
+            );
 
-        let credits;
+            return {
+              movie,
+              cast: data.cast || []
+            };
+          } catch {
+            return {
+              movie,
+              cast: []
+            };
+          }
+        })
+      );
 
-        try {
-          credits = await getMovieCredits(current.person.id);
-        } catch (error) {
-          continue;
-        }
+      /*
+       * See if the target actor appears in any of these movies.
+       */
 
-        credits.sort(
-          (a, b) => (b.popularity || 0) - (a.popularity || 0)
+      for (const result of castResults) {
+        const target = result.cast.find(
+          person =>
+            person.id === actorB.id &&
+            realActingCredit(person)
         );
 
-        /*
-         * Check the most relevant movies for this actor.
-         */
-        const currentMovies = credits.slice(0, 40);
+        if (target) {
+          return res.status(200).json({
+            from: {
+              id: actorA.id,
+              name: actorA.name
+            },
 
-        for (const movie of currentMovies) {
-          let cast;
+            to: {
+              id: actorB.id,
+              name: actorB.name
+            },
 
-          if (movieCache.has(movie.id)) {
-            cast = movieCache.get(movie.id);
-          } else {
-            try {
-              cast = await getMovieCast(movie.id);
-              movieCache.set(movie.id, cast);
-            } catch (error) {
-              continue;
-            }
-          }
+            distance: 1,
 
-          for (const person of cast) {
-            if (!isRealActingCredit(person)) {
-              continue;
-            }
-
-            if (person.id === current.person.id) {
-              continue;
-            }
-
-            /*
-             * We found the target.
-             */
-            if (person.id === actorB.id) {
-              const newPath = [
-                ...current.path,
-                {
-                  person: {
-                    id: person.id,
-                    name: person.name
-                  },
-                  movie: movieInfo(movie)
-                }
-              ];
-
-              return res.status(200).json({
-                from: {
+            path: [
+              {
+                person: {
                   id: actorA.id,
                   name: actorA.name
-                },
-                to: {
+                }
+              },
+
+              {
+                person: {
                   id: actorB.id,
                   name: actorB.name
                 },
-                distance: current.distance + 1,
-                path: newPath
-              });
-            }
 
-            /*
-             * Don't visit the same actor twice.
-             * This prevents paths such as:
-             *
-             * Tom Cruise
-             * → Michelle Monaghan
-             * → Michelle Monaghan
-             */
-            if (!visitedActors.has(person.id)) {
-              visitedActors.add(person.id);
-
-              queue.push({
-                person: {
-                  id: person.id,
-                  name: person.name
-                },
-                path: [
-                  ...current.path,
-                  {
-                    person: {
-                      id: person.id,
-                      name: person.name
-                    },
-                    movie: movieInfo(movie)
-                  }
-                ],
-                distance: current.distance + 1
-              });
-            }
-          }
+                movie: movieData(result.movie)
+              }
+            ]
+          });
         }
       }
 
+      /*
+       * We haven't found a connection yet.
+       *
+       * Return a clean result rather than leaving the user
+       * staring at "Searching the Movie Universe."
+       */
+
       return res.status(404).json({
-        error: `No acting connection between ${actorA.name} and ${actorB.name} was found within six degrees.`
+        error:
+          `No connection found yet between ${actorA.name} and ${actorB.name}.`
       });
 
     } catch (error) {
       console.error("Six Degrees error:", error);
 
       return res.status(500).json({
-        error: "Six Degrees search failed. Please try again."
+        error: "Six Degrees search failed."
       });
     }
   }
 
   /*
+   * =========================================================
    * NORMAL REELWISE SEARCH
+   * =========================================================
    */
 
   try {
     if (type === "movie") {
       const data = await tmdb(
-        `/search/movie?query=${encodeURIComponent(q || "")}&language=en-US`
+        `/search/movie?query=${encodeURIComponent(
+          q || ""
+        )}&language=en-US`
       );
 
       return res.status(200).json(data);
@@ -362,7 +323,9 @@ export default async function handler(req, res) {
 
     if (type === "person") {
       const data = await tmdb(
-        `/search/person?query=${encodeURIComponent(q || "")}&language=en-US`
+        `/search/person?query=${encodeURIComponent(
+          q || ""
+        )}&language=en-US`
       );
 
       return res.status(200).json(data);
@@ -385,7 +348,9 @@ export default async function handler(req, res) {
     }
 
     const data = await tmdb(
-      `/search/multi?query=${encodeURIComponent(q || "")}&language=en-US`
+      `/search/multi?query=${encodeURIComponent(
+        q || ""
+      )}&language=en-US`
     );
 
     return res.status(200).json(data);
@@ -394,7 +359,7 @@ export default async function handler(req, res) {
     console.error("Reelwise search error:", error);
 
     return res.status(500).json({
-      error: "Search failed. Please try again."
+      error: "Search failed."
     });
   }
 }
