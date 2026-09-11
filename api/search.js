@@ -20,7 +20,10 @@ export default async function handler(req, res) {
     );
 
     if (!response.ok) {
-      throw new Error("TMDB request failed");
+      const text = await response.text();
+      throw new Error(
+        `TMDB request failed: ${response.status} ${text}`
+      );
     }
 
     return response.json();
@@ -41,7 +44,7 @@ export default async function handler(req, res) {
       }
 
       /*
-       * Find an actor by name.
+       * Find the actor in TMDB.
        */
       const findPerson = async (name) => {
         const data = await tmdb(
@@ -52,13 +55,20 @@ export default async function handler(req, res) {
 
         const results = data.results || [];
 
+        /*
+         * Prefer an exact name match.
+         */
         const exact = results.find(
           (person) =>
-            person.known_for_department === "Acting" &&
+            person.name &&
             person.name.toLowerCase() ===
               name.trim().toLowerCase()
         );
 
+        /*
+         * Otherwise prefer someone whose department
+         * is Acting.
+         */
         const actor =
           exact ||
           results.find(
@@ -67,7 +77,9 @@ export default async function handler(req, res) {
           );
 
         if (!actor) {
-          throw new Error(`I couldn't find ${name}.`);
+          throw new Error(
+            `I couldn't find ${name}.`
+          );
         }
 
         return {
@@ -99,21 +111,26 @@ export default async function handler(req, res) {
       }
 
       /*
-       * Caches keep the number of TMDB requests manageable.
+       * ============================================================
+       * CREDIT FILTERING
+       * ============================================================
        */
-      const personMoviesCache = new Map();
-      const movieCastCache = new Map();
 
-      /*
-       * Determine whether a credit is a real acting role.
-       */
       const isRealActingCredit = (credit) => {
-        if (!credit || !credit.id || !credit.title) {
+        if (!credit) {
+          return false;
+        }
+
+        if (!credit.id) {
+          return false;
+        }
+
+        if (!credit.title) {
           return false;
         }
 
         /*
-         * Documentary.
+         * Exclude documentaries.
          */
         if (
           Array.isArray(credit.genre_ids) &&
@@ -129,8 +146,7 @@ export default async function handler(req, res) {
           .toLowerCase();
 
         /*
-         * No character usually means this is not useful
-         * for the Six Degrees game.
+         * Require an actual character.
          */
         if (!character) {
           return false;
@@ -140,9 +156,10 @@ export default async function handler(req, res) {
          * Exclude appearances as themselves.
          */
         if (
-          /^(self|himself|herself|themselves)$/.test(
-            character
-          )
+          character === "self" ||
+          character === "himself" ||
+          character === "herself" ||
+          character === "themselves"
         ) {
           return false;
         }
@@ -161,8 +178,13 @@ export default async function handler(req, res) {
       };
 
       /*
-       * Get movies for an actor.
+       * ============================================================
+       * PERSON MOVIE CREDITS
+       * ============================================================
        */
+
+      const personMoviesCache = new Map();
+
       const getPersonMovies = async (personId) => {
         if (personMoviesCache.has(personId)) {
           return personMoviesCache.get(personId);
@@ -176,14 +198,19 @@ export default async function handler(req, res) {
           .filter(isRealActingCredit)
           .filter(
             (movie) =>
-              movie.release_date &&
-              movie.title
+              movie.title &&
+              movie.id
           )
-          .sort(
-            (a, b) =>
-              new Date(b.release_date || 0) -
-              new Date(a.release_date || 0)
-          );
+          .map((movie) => ({
+            id: movie.id,
+            title: movie.title,
+            release_date:
+              movie.release_date || "",
+            character:
+              movie.character || "",
+            genre_ids:
+              movie.genre_ids || []
+          }));
 
         personMoviesCache.set(
           personId,
@@ -194,8 +221,13 @@ export default async function handler(req, res) {
       };
 
       /*
-       * Get the actual acting cast of a movie.
+       * ============================================================
+       * MOVIE CAST
+       * ============================================================
        */
+
+      const movieCastCache = new Map();
+
       const getMovieCast = async (movieId) => {
         if (movieCastCache.has(movieId)) {
           return movieCastCache.get(movieId);
@@ -222,9 +254,10 @@ export default async function handler(req, res) {
             }
 
             if (
-              /^(self|himself|herself|themselves)$/.test(
-                character
-              )
+              character === "self" ||
+              character === "himself" ||
+              character === "herself" ||
+              character === "themselves"
             ) {
               return false;
             }
@@ -250,14 +283,31 @@ export default async function handler(req, res) {
 
       /*
        * ============================================================
-       * FIRST: CHECK FOR A DIRECT MOVIE CONNECTION
+       * DIRECT CONNECTION
        * ============================================================
        *
-       * This is important.
+       * This is the most important part.
        *
-       * If Tom Cruise and Michelle Monaghan were both
-       * actual actors in the same movie, the answer is
-       * immediately ONE connection.
+       * We compare the complete TMDB movie-credit lists for
+       * both actors using the actual movie ID.
+       *
+       * Example:
+       *
+       * Tom Cruise
+       * Michelle Monaghan
+       *
+       * Both have:
+       * Mission: Impossible - Fallout
+       *
+       * Therefore:
+       *
+       * Tom Cruise
+       *       ↓
+       * Mission: Impossible - Fallout
+       *       ↓
+       * Michelle Monaghan
+       *
+       * Distance = 1
        */
 
       const startMovies =
@@ -266,18 +316,22 @@ export default async function handler(req, res) {
       const targetMovies =
         await getPersonMovies(target.id);
 
-      const targetMovieMap = new Map();
-
-      for (const movie of targetMovies) {
-        targetMovieMap.set(
-          movie.id,
-          movie
+      /*
+       * Use movie ID as the primary match.
+       */
+      const targetMovieIds =
+        new Set(
+          targetMovies.map(
+            (movie) => String(movie.id)
+          )
         );
-      }
 
       const directMovie =
-        startMovies.find((movie) =>
-          targetMovieMap.has(movie.id)
+        startMovies.find(
+          (movie) =>
+            targetMovieIds.has(
+              String(movie.id)
+            )
         );
 
       if (directMovie) {
@@ -287,16 +341,99 @@ export default async function handler(req, res) {
           distance: 1,
           path: [
             {
-              person: start,
+              person: {
+                id: start.id,
+                name: start.name
+              },
               movie: null
             },
             {
-              person: target,
+              person: {
+                id: target.id,
+                name: target.name
+              },
               movie: {
                 id: directMovie.id,
                 title: directMovie.title,
                 year: (
                   directMovie.release_date || ""
+                ).slice(0, 4)
+              }
+            }
+          ]
+        });
+      }
+
+      /*
+       * ============================================================
+       * FALLBACK DIRECT MATCH BY TITLE
+       * ============================================================
+       *
+       * Occasionally TMDB data can contain duplicate or slightly
+       * different credit records for the same movie.
+       *
+       * So we also compare normalized movie titles.
+       */
+
+      const normalizeTitle = (title) =>
+        String(title || "")
+          .toLowerCase()
+          .replace(/[^a-z0-9]/g, "");
+
+      const targetTitleMap = new Map();
+
+      for (const movie of targetMovies) {
+        const key =
+          normalizeTitle(movie.title);
+
+        if (key) {
+          targetTitleMap.set(
+            key,
+            movie
+          );
+        }
+      }
+
+      const titleMatch =
+        startMovies.find((movie) =>
+          targetTitleMap.has(
+            normalizeTitle(movie.title)
+          )
+        );
+
+      if (titleMatch) {
+        const matchedMovie =
+          targetTitleMap.get(
+            normalizeTitle(titleMatch.title)
+          );
+
+        return res.status(200).json({
+          from: start,
+          to: target,
+          distance: 1,
+          path: [
+            {
+              person: {
+                id: start.id,
+                name: start.name
+              },
+              movie: null
+            },
+            {
+              person: {
+                id: target.id,
+                name: target.name
+              },
+              movie: {
+                id:
+                  matchedMovie.id ||
+                  titleMatch.id,
+                title:
+                  titleMatch.title,
+                year: (
+                  titleMatch.release_date ||
+                  matchedMovie.release_date ||
+                  ""
                 ).slice(0, 4)
               }
             }
@@ -324,23 +461,22 @@ export default async function handler(req, res) {
         }
       ];
 
-      const visitedA = new Set([
-        start.id
-      ]);
+      const visitedA =
+        new Set([start.id]);
 
-      const visitedB = new Set([
-        target.id
-      ]);
+      const visitedB =
+        new Set([target.id]);
 
       const parentA = new Map();
       const parentB = new Map();
 
       let depthA = 0;
       let depthB = 0;
+
       let meetingId = null;
 
       /*
-       * Expand one side of the search.
+       * Expand one side of the graph.
        */
       const expand = async (
         frontier,
@@ -354,12 +490,14 @@ export default async function handler(req, res) {
             await getPersonMovies(actor.id);
 
           /*
-           * Limit each actor to the most useful
-           * movie credits to keep the API practical.
+           * Keep the search practical.
            */
           const selectedMovies =
             movies.slice(0, 100);
 
+          /*
+           * Process movies in batches.
+           */
           for (
             let i = 0;
             i < selectedMovies.length;
@@ -388,7 +526,7 @@ export default async function handler(req, res) {
 
               for (const person of cast) {
                 /*
-                 * Never add the actor themselves.
+                 * Never connect an actor to themselves.
                  */
                 if (
                   person.id === actor.id
@@ -397,8 +535,8 @@ export default async function handler(req, res) {
                 }
 
                 /*
-                 * Never add an actor twice
-                 * on the same side of the search.
+                 * Don't revisit an actor on the
+                 * same side.
                  */
                 if (
                   visited.has(person.id)
@@ -411,7 +549,8 @@ export default async function handler(req, res) {
                 parents.set(
                   person.id,
                   {
-                    previous: actor.id,
+                    previous:
+                      actor.id,
                     movie: {
                       id: movie.id,
                       title: movie.title,
@@ -436,16 +575,16 @@ export default async function handler(req, res) {
       };
 
       /*
-       * Search up to six movie connections.
+       * Search up to six degrees.
        */
       while (
         !meetingId &&
         depthA + depthB < 6 &&
-        frontierA.length &&
-        frontierB.length
+        frontierA.length > 0 &&
+        frontierB.length > 0
       ) {
         /*
-         * Always expand the smaller side.
+         * Expand the smaller frontier.
          */
         if (
           frontierA.length <=
@@ -492,8 +631,11 @@ export default async function handler(req, res) {
       }
 
       /*
-       * No connection.
+       * ============================================================
+       * NO CONNECTION
+       * ============================================================
        */
+
       if (!meetingId) {
         return res.status(404).json({
           error:
@@ -504,7 +646,7 @@ export default async function handler(req, res) {
 
       /*
        * ============================================================
-       * RECONSTRUCT THE PATH
+       * RECONSTRUCT LEFT SIDE
        * ============================================================
        */
 
@@ -521,7 +663,7 @@ export default async function handler(req, res) {
         if (!edge) {
           return res.status(404).json({
             error:
-              "The connection could not be reconstructed.",
+              "Connection reconstruction failed.",
             path: []
           });
         }
@@ -543,8 +685,11 @@ export default async function handler(req, res) {
       left.reverse();
 
       /*
-       * Build the target side.
+       * ============================================================
+       * RECONSTRUCT RIGHT SIDE
+       * ============================================================
        */
+
       const right = [];
 
       cursor = meetingId;
@@ -558,7 +703,7 @@ export default async function handler(req, res) {
         if (!edge) {
           return res.status(404).json({
             error:
-              "The connection could not be reconstructed.",
+              "Connection reconstruction failed.",
             path: []
           });
         }
@@ -577,14 +722,13 @@ export default async function handler(req, res) {
         movie: null
       });
 
-      /*
-       * Reverse the target side.
-       */
       right.reverse();
 
       /*
-       * Combine both sides without duplicating
-       * the meeting actor.
+       * Combine the two sides.
+       *
+       * The meeting actor appears on both sides,
+       * so remove it from the second side.
        */
       const combined = [
         ...left,
@@ -592,27 +736,32 @@ export default async function handler(req, res) {
       ];
 
       /*
-       * Absolutely prevent duplicate actors
-       * from appearing in the final answer.
+       * ============================================================
+       * REMOVE ANY DUPLICATE ACTORS
+       * ============================================================
        */
-      const seenFinal = new Set();
+
+      const seen = new Set();
 
       const cleanPath = [];
 
       for (const node of combined) {
         if (
-          seenFinal.has(node.id)
+          seen.has(node.id)
         ) {
           continue;
         }
 
-        seenFinal.add(node.id);
+        seen.add(node.id);
         cleanPath.push(node);
       }
 
       /*
-       * Get names for intermediate actors.
+       * ============================================================
+       * GET ACTOR NAMES
+       * ============================================================
        */
+
       const names = new Map([
         [start.id, start.name],
         [target.id, target.name]
@@ -645,8 +794,11 @@ export default async function handler(req, res) {
       }
 
       /*
-       * Build final Reelwise response.
+       * ============================================================
+       * FINAL PATH
+       * ============================================================
        */
+
       const path =
         cleanPath.map(
           (node, index) => ({
