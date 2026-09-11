@@ -287,7 +287,61 @@ export default async function handler(req, res) {
       ])
     );
   }
+// Fast two-step connection check
+const startTop = startMovies.slice(0, 30);
+const targetTop = targetMovies.slice(0, 30);
 
+const loadCasts = async (movies) => {
+  const results = [];
+  for (let i = 0; i < movies.length; i += 8) {
+    const batch = movies.slice(i, i + 8);
+    const casts = await Promise.all(
+      batch.map(movie => getMovieCast(movie.id))
+    );
+    casts.forEach((cast, index) => {
+      results.push({ movie: batch[index], cast });
+    });
+  }
+  return results;
+};
+
+const startCastMovies = await loadCasts(startTop);
+const targetCastMovies = await loadCasts(targetTop);
+
+const middleActors = new Map();
+
+for (const item of startCastMovies) {
+  for (const person of item.cast) {
+    if (person.id !== start.id && !middleActors.has(person.id)) {
+      middleActors.set(person.id, {
+        person,
+        movie: item.movie
+      });
+    }
+  }
+}
+
+for (const item of targetCastMovies) {
+  for (const person of item.cast) {
+    const match = middleActors.get(person.id);
+
+    if (match && person.id !== target.id) {
+      return res.status(200).json(formatResult([
+        { id: start.id, name: start.name, movie: null },
+        {
+          id: match.person.id,
+          name: match.person.name,
+          movie: match.movie
+        },
+        {
+          id: target.id,
+          name: target.name,
+          movie: item.movie
+        }
+      ]));
+    }
+  }
+}
   /*
    * Bidirectional breadth-first search.
    *
