@@ -27,42 +27,34 @@ export default async function handler(req, res) {
     return response.json();
   }
 
-  async function findActor(name) {
-    const data = await tmdb(
-      `/search/person?query=${encodeURIComponent(name)}&language=en-US`
-    );
-
-    if (!data.results || data.results.length === 0) {
-      return null;
-    }
-
-    const exact = data.results.find(
-      person =>
-        person.name &&
-        person.name.toLowerCase() === name.toLowerCase()
-    );
-
-    return exact || data.results[0];
+  function normalize(value) {
+    return String(value || "")
+      .toLowerCase()
+      .replace(/[^a-z0-9]/g, "");
   }
-
-  /*
-   * =========================================================
-   * REAL ACTING CREDIT FILTER
-   * =========================================================
-   */
 
   function isRealActingCredit(credit) {
     if (!credit) return false;
 
-    const character = String(
-      credit.character || ""
-    ).trim().toLowerCase();
+    const character = String(credit.character || "").toLowerCase();
 
     if (!character) return false;
 
-    /*
-     * Exclude documentaries.
-     */
+    const bad = [
+      "self",
+      "himself",
+      "herself",
+      "themselves",
+      "archive footage",
+      "archive",
+      "interviewee",
+      "interviewer"
+    ];
+
+    if (bad.some(word => character.includes(word))) {
+      return false;
+    }
+
     if (
       Array.isArray(credit.genre_ids) &&
       credit.genre_ids.includes(99)
@@ -70,45 +62,37 @@ export default async function handler(req, res) {
       return false;
     }
 
-    /*
-     * Exclude Self / Himself / Herself / Themselves
-     * and archive footage.
-     */
-    const excludedCharacters = new Set([
-      "self",
-      "himself",
-      "herself",
-      "themselves",
-      "archive footage",
-      "archive footage (uncredited)",
-      "archive footage (archive)"
-    ]);
-
-    if (excludedCharacters.has(character)) {
-      return false;
-    }
-
-    if (character.includes("archive footage")) {
-      return false;
-    }
-
-    /*
-     * Don't use obvious interview / documentary appearances.
-     */
-    if (
-      character === "interviewee" ||
-      character === "interviewer" ||
-      character === "as himself" ||
-      character === "as herself" ||
-      character === "as self"
-    ) {
-      return false;
-    }
-
     return true;
   }
 
-  function movieData(movie) {
+  async function findActor(name) {
+    const data = await tmdb(
+      `/search/person?query=${encodeURIComponent(name)}&language=en-US`
+    );
+
+    const results = Array.isArray(data.results)
+      ? data.results
+      : [];
+
+    if (!results.length) return null;
+
+    const exact = results.find(
+      person =>
+        person.name &&
+        person.name.toLowerCase() === name.toLowerCase() &&
+        person.known_for_department === "Acting"
+    );
+
+    if (exact) return exact;
+
+    const acting = results.find(
+      person => person.known_for_department === "Acting"
+    );
+
+    return acting || results[0];
+  }
+
+  function movieInfo(movie) {
     return {
       id: movie.id,
       title: movie.title,
@@ -118,368 +102,288 @@ export default async function handler(req, res) {
     };
   }
 
-  function personData(person) {
-    return {
-      id: person.id,
-      name: person.name
-    };
-  }
-
-  /*
-   * =========================================================
-   * SIX DEGREES HELPERS
-   * =========================================================
-   */
-
-  const actorCreditCache = new Map();
-  const movieCastCache = new Map();
-
   async function getActorMovies(actorId) {
-    if (actorCreditCache.has(actorId)) {
-      return actorCreditCache.get(actorId);
-    }
-
     const data = await tmdb(
       `/person/${actorId}/movie_credits?language=en-US`
     );
 
-    const movies = (data.cast || []).filter(
-      isRealActingCredit
-    );
-
-    actorCreditCache.set(actorId, movies);
-
-    return movies;
+    return (data.cast || [])
+      .filter(isRealActingCredit)
+      .filter(movie => movie.id && movie.title)
+      .sort(
+        (a, b) =>
+          (b.popularity || 0) -
+          (a.popularity || 0)
+      );
   }
 
   async function getMovieCast(movieId) {
-    if (movieCastCache.has(movieId)) {
-      return movieCastCache.get(movieId);
-    }
+    const data = await tmdb(
+      `/movie/${movieId}/credits?language=en-US`
+    );
 
-    try {
-      const data = await tmdb(
-        `/movie/${movieId}/credits?language=en-US`
-      );
-
-      const cast = (data.cast || []).filter(
-        isRealActingCredit
-      );
-
-      movieCastCache.set(movieId, cast);
-
-      return cast;
-    } catch {
-      movieCastCache.set(movieId, []);
-      return [];
-    }
+    return (data.cast || [])
+      .filter(isRealActingCredit)
+      .filter(person => person.id && person.name);
   }
 
-  /*
-   * =========================================================
-   * FIND DIRECT MOVIE CONNECTION
-   * =========================================================
-   */
+  function findSharedMovie(moviesA, moviesB) {
+    const byId = new Map();
 
-  async function findSharedMovie(actorA, actorB) {
+    for (const movie of moviesB) {
+      byId.set(movie.id, movie);
+    }
+
+    for (const movie of moviesA) {
+      if (byId.has(movie.id)) {
+        return movie;
+      }
+    }
+
+    const byTitle = new Map();
+
+    for (const movie of moviesB) {
+      byTitle.set(normalize(movie.title), movie);
+    }
+
+    for (const movie of moviesA) {
+      if (byTitle.has(normalize(movie.title))) {
+        return movie;
+      }
+    }
+
+    return null;
+  }
+
+  async function directConnection(actorA, actorB) {
     const [moviesA, moviesB] = await Promise.all([
       getActorMovies(actorA.id),
       getActorMovies(actorB.id)
     ]);
 
-    const moviesBMap = new Map();
+    const shared = findSharedMovie(moviesA, moviesB);
 
-    for (const movie of moviesB) {
-      moviesBMap.set(movie.id, movie);
-    }
-
-    const shared = moviesA.filter(movie =>
-      moviesBMap.has(movie.id)
-    );
-
-    if (shared.length === 0) {
+    if (!shared) {
       return null;
     }
 
-    shared.sort(
-      (a, b) =>
-        (b.popularity || 0) -
-        (a.popularity || 0)
-    );
-
-    return shared[0];
+    return {
+      distance: 1,
+      path: [
+        {
+          person: {
+            id: actorA.id,
+            name: actorA.name
+          }
+        },
+        {
+          person: {
+            id: actorB.id,
+            name: actorB.name
+          },
+          movie: movieInfo(shared)
+        }
+      ]
+    };
   }
 
-  /*
-   * =========================================================
-   * SIX DEGREES BREADTH-FIRST SEARCH
-   *
-   * Actor
-   *   ↓
-   * Movie
-   *   ↓
-   * Actor
-   *   ↓
-   * Movie
-   *   ↓
-   * Actor
-   *
-   * Maximum: 6 actor-to-actor connections.
-   * =========================================================
-   */
-
-  async function findSixDegrees(actorA, actorB) {
+  async function findConnection(actorA, actorB) {
     /*
-     * First check for a direct connection.
-     */
-    const directMovie = await findSharedMovie(
-      actorA,
-      actorB
-    );
+      First: direct connection.
 
-    if (directMovie) {
-      return {
-        distance: 1,
-        path: [
-          {
-            person: personData(actorA)
-          },
-          {
-            person: personData(actorB),
-            movie: movieData(directMovie)
-          }
-        ]
-      };
+      This is the most important test and should be very fast.
+      Example:
+      Tom Cruise → Michelle Monaghan
+      = Mission: Impossible – Fallout
+    */
+
+    const direct = await directConnection(actorA, actorB);
+
+    if (direct) {
+      return direct;
     }
 
     /*
-     * Each queue item represents an actor and the path
-     * used to reach that actor.
-     */
+      Controlled Six Degrees search.
+
+      We deliberately keep these numbers small so the site
+      doesn't get stuck making hundreds of TMDB requests.
+    */
+
+    const MAX_DEGREES = 6;
+    const MAX_MOVIES_PER_ACTOR = 10;
+    const MAX_CAST_PER_MOVIE = 35;
+    const MAX_ACTORS_PER_LEVEL = 25;
+
+    const actorCache = new Map();
+    const movieCache = new Map();
+
+    actorCache.set(actorA.id, {
+      person: actorA,
+      movies: await getActorMovies(actorA.id)
+    });
+
+    async function moviesForActor(actorId) {
+      if (!actorCache.has(actorId)) {
+        const movies = await getActorMovies(actorId);
+
+        actorCache.set(actorId, {
+          person: null,
+          movies
+        });
+      }
+
+      return actorCache.get(actorId).movies;
+    }
+
+    async function castForMovie(movieId) {
+      if (movieCache.has(movieId)) {
+        return movieCache.get(movieId);
+      }
+
+      const cast = await getMovieCast(movieId);
+
+      const limited = cast
+        .sort(
+          (a, b) =>
+            (b.popularity || 0) -
+            (a.popularity || 0)
+        )
+        .slice(0, MAX_CAST_PER_MOVIE);
+
+      movieCache.set(movieId, limited);
+
+      return limited;
+    }
+
+    /*
+      Each queue item represents an actor we've reached,
+      plus the path used to reach that actor.
+    */
+
     let frontier = [
       {
         person: actorA,
         path: [
           {
-            person: personData(actorA)
+            person: {
+              id: actorA.id,
+              name: actorA.name
+            }
           }
         ]
       }
     ];
 
-    const visitedActors = new Set([
-      actorA.id
-    ]);
+    const visited = new Set([actorA.id]);
 
-    /*
-     * Maximum six actor connections.
-     */
-    const MAX_DEGREES = 6;
-
-    /*
-     * Prevent the search from exploding into thousands
-     * of TMDB requests.
-     */
-    const MAX_MOVIES_PER_ACTOR = 30;
-
-    const MAX_CAST_PER_MOVIE = 60;
-
-    for (
-      let depth = 1;
-      depth <= MAX_DEGREES;
-      depth++
-    ) {
-      const nextFrontier = [];
+    for (let degree = 1; degree <= MAX_DEGREES; degree++) {
+      const next = [];
 
       /*
-       * Get movie credits for every actor currently
-       * being examined.
-       */
-      const actorMovieResults =
-        await Promise.all(
-          frontier.map(async node => {
-            try {
-              const movies = await getActorMovies(
-                node.person.id
-              );
+        Look at movies for the current actors.
+      */
 
-              /*
-               * Popular movies first.
-               */
-              movies.sort(
-                (a, b) =>
-                  (b.popularity || 0) -
-                  (a.popularity || 0)
-              );
+      for (const node of frontier) {
+        const movies = await moviesForActor(node.person.id);
 
-              return {
-                node,
-                movies: movies.slice(
-                  0,
-                  MAX_MOVIES_PER_ACTOR
-                )
-              };
-            } catch {
-              return {
-                node,
-                movies: []
-              };
-            }
-          })
-        );
+        const selectedMovies = movies
+          .slice(0, MAX_MOVIES_PER_ACTOR);
 
-      /*
-       * Collect unique movies across the frontier.
-       */
-      const movieMap = new Map();
+        /*
+          Check the most popular movies first.
+        */
 
-      for (const result of actorMovieResults) {
-        for (const movie of result.movies) {
-          if (!movieMap.has(movie.id)) {
-            movieMap.set(movie.id, {
-              movie,
-              parentNodes: []
-            });
-          }
+        for (const movie of selectedMovies) {
+          const cast = await castForMovie(movie.id);
 
-          movieMap
-            .get(movie.id)
-            .parentNodes
-            .push(result.node);
-        }
-      }
-
-      /*
-       * Get movie casts in parallel.
-       */
-      const movieResults =
-        await Promise.all(
-          [...movieMap.values()].map(
-            async item => {
-              const cast =
-                await getMovieCast(
-                  item.movie.id
-                );
-
-              return {
-                ...item,
-                cast:
-                  cast.slice(
-                    0,
-                    MAX_CAST_PER_MOVIE
-                  )
-              };
-            }
-          )
-        );
-
-      /*
-       * Examine every cast member as a possible
-       * next actor in the chain.
-       */
-      for (const result of movieResults) {
-        for (const castMember of result.cast) {
           /*
-           * Have we reached the target?
-           */
-          if (
-            castMember.id === actorB.id
-          ) {
-            const parent =
-              result.parentNodes[0];
+            Is our target actor in this movie?
+          */
 
+          const target = cast.find(
+            person => person.id === actorB.id
+          );
+
+          if (target) {
             return {
-              distance: depth,
+              distance: degree,
               path: [
-                ...parent.path,
+                ...node.path,
                 {
-                  person:
-                    personData(actorB),
-                  movie:
-                    movieData(result.movie)
+                  person: {
+                    id: actorB.id,
+                    name: actorB.name
+                  },
+                  movie: movieInfo(movie)
                 }
               ]
             };
           }
 
           /*
-           * Don't revisit an actor.
-           */
-          if (
-            visitedActors.has(
-              castMember.id
-            )
-          ) {
-            continue;
+            Add promising actors to the next level.
+          */
+
+          for (const person of cast) {
+            if (!person.id) continue;
+            if (person.id === actorA.id) continue;
+            if (visited.has(person.id)) continue;
+
+            visited.add(person.id);
+
+            next.push({
+              person,
+              path: [
+                ...node.path,
+                {
+                  person: {
+                    id: person.id,
+                    name: person.name
+                  },
+                  movie: movieInfo(movie)
+                }
+              ]
+            });
+
+            if (next.length >= MAX_ACTORS_PER_LEVEL) {
+              break;
+            }
           }
 
-          /*
-           * Add actor to the next search level.
-           */
-          visitedActors.add(
-            castMember.id
-          );
+          if (next.length >= MAX_ACTORS_PER_LEVEL) {
+            break;
+          }
+        }
 
-          const parent =
-            result.parentNodes[0];
-
-          nextFrontier.push({
-            person: {
-              id: castMember.id,
-              name: castMember.name
-            },
-
-            path: [
-              ...parent.path,
-
-              {
-                person: personData(
-                  castMember
-                ),
-
-                movie:
-                  movieData(result.movie)
-              }
-            ]
-          });
+        if (next.length >= MAX_ACTORS_PER_LEVEL) {
+          break;
         }
       }
 
       /*
-       * No more actors to search.
-       */
-      if (
-        nextFrontier.length === 0
-      ) {
-        break;
-      }
+        Prefer the most popular actors for the next level.
+      */
 
-      /*
-       * Keep the frontier manageable.
-       *
-       * More popular actors are searched first.
-       */
-      nextFrontier.sort(
+      next.sort(
         (a, b) =>
           (b.person.popularity || 0) -
           (a.person.popularity || 0)
       );
 
-      /*
-       * Keep the search from becoming enormous.
-       */
-      frontier =
-        nextFrontier.slice(0, 150);
+      frontier = next.slice(0, MAX_ACTORS_PER_LEVEL);
+
+      if (!frontier.length) {
+        break;
+      }
     }
 
     return null;
   }
 
   /*
-   * =========================================================
-   * SIX DEGREES API
-   * =========================================================
-   */
+    SIX DEGREES
+  */
 
   if (type === "degrees") {
     try {
@@ -489,73 +393,68 @@ export default async function handler(req, res) {
         });
       }
 
-      const [actorA, actorB] =
-        await Promise.all([
-          findActor(from),
-          findActor(to)
-        ]);
+      const [actorA, actorB] = await Promise.all([
+        findActor(from),
+        findActor(to)
+      ]);
 
       if (!actorA) {
         return res.status(404).json({
-          error:
-            `Actor "${from}" was not found.`
+          error: `Actor "${from}" was not found.`
         });
       }
 
       if (!actorB) {
         return res.status(404).json({
-          error:
-            `Actor "${to}" was not found.`
+          error: `Actor "${to}" was not found.`
         });
       }
 
-      if (
-        actorA.id === actorB.id
-      ) {
+      if (actorA.id === actorB.id) {
         return res.status(400).json({
-          error:
-            "Choose two different actors."
+          error: "Choose two different actors."
         });
       }
 
-      const result =
-        await findSixDegrees(
-          actorA,
-          actorB
-        );
+      const result = await findConnection(
+        actorA,
+        actorB
+      );
 
       if (!result) {
         return res.status(404).json({
           error:
-            `Reelwise could not find a connection between ${actorA.name} and ${actorB.name} within six degrees.`
+            `No connection found within six degrees between ${actorA.name} and ${actorB.name}.`
         });
       }
 
       return res.status(200).json({
-        from: personData(actorA),
-        to: personData(actorB),
+        from: {
+          id: actorA.id,
+          name: actorA.name
+        },
+
+        to: {
+          id: actorB.id,
+          name: actorB.name
+        },
+
         distance: result.distance,
         path: result.path
       });
 
     } catch (error) {
-      console.error(
-        "Six Degrees error:",
-        error
-      );
+      console.error("Six Degrees error:", error);
 
       return res.status(500).json({
-        error:
-          "Six Degrees search failed."
+        error: "Six Degrees search failed."
       });
     }
   }
 
   /*
-   * =========================================================
-   * NORMAL REELWISE SEARCH
-   * =========================================================
-   */
+    NORMAL REELWISE SEARCH
+  */
 
   try {
     if (type === "movie") {
@@ -603,10 +502,7 @@ export default async function handler(req, res) {
     return res.status(200).json(data);
 
   } catch (error) {
-    console.error(
-      "Reelwise search error:",
-      error
-    );
+    console.error("Reelwise search error:", error);
 
     return res.status(500).json({
       error: "Search failed."
