@@ -38,7 +38,7 @@ header{
   position:sticky;
   top:0;
   z-index:5;
-  background:rgba(9,11,15,.96);
+  background:rgba(9,11,15,.97);
   backdrop-filter:blur(12px);
   border-bottom:1px solid var(--line)
 }
@@ -74,9 +74,7 @@ nav button{
   padding:8px 10px
 }
 
-nav button:hover{
-  color:white
-}
+nav button:hover{color:white}
 
 .searchbox{
   margin-left:auto;
@@ -94,9 +92,7 @@ nav button:hover{
   outline:none
 }
 
-.searchbox input:focus{
-  border-color:var(--accent)
-}
+.searchbox input:focus{border-color:var(--accent)}
 
 .searchbox button,
 .cta{
@@ -108,9 +104,7 @@ nav button:hover{
   font-weight:800
 }
 
-.page{
-  padding:45px 0 70px
-}
+.page{padding:45px 0 70px}
 
 .hero{
   padding:55px 0 40px;
@@ -153,9 +147,7 @@ nav button:hover{
 
 .heroCard b{font-size:28px}
 
-.section{
-  padding:28px 0
-}
+.section{padding:28px 0}
 
 .sectionhead{
   display:flex;
@@ -169,9 +161,7 @@ nav button:hover{
   font-size:28px
 }
 
-.muted{
-  color:var(--muted)
-}
+.muted{color:var(--muted)}
 
 .grid{
   display:grid;
@@ -200,27 +190,30 @@ nav button:hover{
   align-items:end;
   padding:15px;
   font-size:20px;
-  font-weight:900
+  font-weight:900;
+  position:relative
 }
 
 .poster img{
   width:100%;
   height:100%;
   object-fit:cover;
-  display:block
+  display:block;
+  position:absolute;
+  inset:0
 }
 
-.info{
-  padding:13px
+.poster span{
+  position:relative;
+  z-index:1;
+  text-shadow:0 2px 8px #000
 }
 
-.info b{
-  display:block
-}
+.info{padding:13px}
 
-.info small{
-  color:var(--muted)
-}
+.info b{display:block}
+
+.info small{color:var(--muted)}
 
 .feature{
   background:var(--panel);
@@ -249,7 +242,7 @@ nav button:hover{
 .detailposter{
   aspect-ratio:2/3;
   border-radius:15px;
-  background:linear-gradient(145deg,#39495f,#10141a);
+  background:#151a22;
   overflow:hidden
 }
 
@@ -325,9 +318,7 @@ nav button:hover{
   font-size:18px
 }
 
-.fact small{
-  color:var(--muted)
-}
+.fact small{color:var(--muted)}
 
 .cast{
   display:flex;
@@ -356,7 +347,22 @@ nav button:hover{
   padding:14px;
   display:flex;
   justify-content:space-between;
+  align-items:center;
   cursor:pointer
+}
+
+.result:hover{border-color:var(--accent)}
+
+.resultTitle{
+  font-weight:800;
+  font-size:17px
+}
+
+.resultType{
+  color:var(--gold);
+  font-size:12px;
+  font-weight:800;
+  text-transform:uppercase
 }
 
 .empty{
@@ -381,9 +387,7 @@ nav button:hover{
   border-bottom:1px solid var(--line)
 }
 
-.quote:last-child{
-  border-bottom:0
-}
+.quote:last-child{border-bottom:0}
 
 .degreeBox{
   max-width:800px;
@@ -490,9 +494,7 @@ nav button:hover{
     margin-left:0
   }
 
-  .searchbox input{
-    width:100%
-  }
+  .searchbox input{width:100%}
 
   nav{
     order:3;
@@ -506,25 +508,6 @@ nav button:hover{
 
   .degreeForm{
     grid-template-columns:1fr
-  }
-}
-
-@media(max-width:480px){
-
-  .grid{
-    grid-template-columns:1fr 1fr
-  }
-
-  .hero{
-    padding-top:35px
-  }
-
-  .hero h1{
-    letter-spacing:-2px
-  }
-
-  .logo{
-    font-size:21px
   }
 }
 </style>
@@ -568,937 +551,980 @@ Reelwise · Know the movie. Know the story.
 
 <script>
 
-const movies = [
-{
-id:"rocky3",
-title:"Rocky III",
-year:1982,
-genre:"Drama · Sports",
-icon:"🥊",
-cast:["Sylvester Stallone","Carl Weathers","Mr. T","Hulk Hogan","Talia Shire"],
-story:"During the Thunderlips sequence, Hulk Hogan hit Stallone hard enough that Stallone feared he had broken his collarbone."
-},
-{
-id:"topgun",
-title:"Top Gun",
-year:1986,
-genre:"Action · Drama",
-icon:"✈️",
-cast:["Tom Cruise","Val Kilmer","Kelly McGillis","Anthony Edwards","Meg Ryan"],
-story:"Tom Cruise specifically wanted Val Kilmer to play Iceman."
-},
-{
-id:"afgm",
-title:"A Few Good Men",
-year:1992,
-genre:"Drama · Legal",
-icon:"⚖️",
-cast:["Tom Cruise","Jack Nicholson","Demi Moore"],
-story:"One of the most quoted courtroom movies of its era."
-},
-{
-id:"sandlot",
-title:"The Sandlot",
-year:1993,
-genre:"Comedy · Family",
-icon:"⚾",
-cast:["Tom Guiry","Mike Vitar","James Earl Jones"],
-story:"A movie that became a cult favorite long after its original theatrical run."
-},
-{
-id:"goodfellas",
-title:"Goodfellas",
-year:1990,
-genre:"Crime · Drama",
-icon:"🍝",
-cast:["Robert De Niro","Ray Liotta","Joe Pesci"],
-story:"Its real-life inspirations and production stories are packed with Reelwise material."
-},
-{
-id:"hangover",
-title:"The Hangover",
-year:2009,
-genre:"Comedy",
-icon:"🍻",
-cast:["Bradley Cooper","Ed Helms","Zach Galifianakis"],
-story:"The chemistry among its three leads became the heart of the franchise."
-},
-{
-id:"oldschool",
-title:"Old School",
-year:2003,
-genre:"Comedy",
-icon:"🎓",
-cast:["Will Ferrell","Luke Wilson","Vince Vaughn"],
-story:"A comedy that helped define the early-2000s comedy era."
-},
-{
-id:"forrest",
-title:"Forrest Gump",
-year:1994,
-genre:"Drama · Comedy",
-icon:"🪶",
-cast:["Tom Hanks","Robin Wright","Gary Sinise"],
-story:"A huge hit whose cast careers offer plenty of surprising connections."
-},
-{
-id:"sixth",
-title:"The Sixth Sense",
-year:1999,
-genre:"Mystery · Drama",
-icon:"👻",
-cast:["Bruce Willis","Haley Joel Osment","Toni Collette"],
-story:"A movie that became a cultural phenomenon and launched a young star."
-},
-{
-id:"godfather",
-title:"The Godfather",
-year:1972,
-genre:"Crime · Drama",
-icon:"🍊",
-cast:["Marlon Brando","Al Pacino","James Caan"],
-story:"The casting and studio battles behind this classic are movie-history gold."
-}
+const app = document.getElementById("app");
+
+const featuredMovies = [
+  {
+    title:"Rocky III",
+    year:1982,
+    icon:"🥊",
+    genre:"Drama · Sports",
+    story:"Rocky Balboa faces Clubber Lang and fights to regain the heavyweight championship."
+  },
+  {
+    title:"Top Gun",
+    year:1986,
+    icon:"✈️",
+    genre:"Action · Drama",
+    story:"Tom Cruise became one of Hollywood's biggest stars as Maverick."
+  },
+  {
+    title:"A Few Good Men",
+    year:1992,
+    icon:"⚖️",
+    genre:"Drama · Legal",
+    story:"One of the most quoted courtroom movies ever made."
+  },
+  {
+    title:"The Sandlot",
+    year:1993,
+    icon:"⚾",
+    genre:"Comedy · Family",
+    story:"A baseball movie that became a cult classic."
+  },
+  {
+    title:"Goodfellas",
+    year:1990,
+    icon:"🍝",
+    genre:"Crime · Drama",
+    story:"Martin Scorsese's iconic look at life inside organized crime."
+  },
+  {
+    title:"The Hangover",
+    year:2009,
+    icon:"🍻",
+    genre:"Comedy",
+    story:"A bachelor party goes spectacularly wrong in Las Vegas."
+  },
+  {
+    title:"Old School",
+    year:2003,
+    icon:"🎓",
+    genre:"Comedy",
+    story:"Three friends attempt to relive their college years."
+  },
+  {
+    title:"Forrest Gump",
+    year:1994,
+    icon:"🪶",
+    genre:"Drama · Comedy",
+    story:"Tom Hanks stars in one of the most recognizable movies of the 1990s."
+  },
+  {
+    title:"The Sixth Sense",
+    year:1999,
+    icon:"👻",
+    genre:"Mystery · Drama",
+    story:"Bruce Willis and Haley Joel Osment star in a modern classic."
+  },
+  {
+    title:"The Godfather",
+    year:1972,
+    icon:"🍊",
+    genre:"Crime · Drama",
+    story:"The Corleone family saga became one of the greatest films in history."
+  }
 ];
 
-const quotes={
-"Rocky III":[
-"There is no tomorrow!",
-"You're gonna eat lightning and crap thunder!",
-"The eye of the tiger, man."
-],
-"Top Gun":[
-"I feel the need—the need for speed.",
-"You can be my wingman anytime.",
-"Talk to me, Goose."
-],
-"A Few Good Men":[
-"You can't handle the truth!",
-"I want the truth!",
-"You're either with us or against us."
-],
-"The Sandlot":[
-"You're killing me, Smalls!",
-"Heroes get remembered, but legends never die.",
-"For-ev-er!"
-],
-"Goodfellas":[
-"As far back as I can remember, I always wanted to be a gangster.",
-"Funny how?",
-"Go home and get your shine box."
-],
-"The Hangover":[
-"What happens in Vegas stays in Vegas.",
-"It's not illegal if you don't get caught.",
-"I'm a nice guy."
-],
-"Old School":[
-"We're going streaking!",
-"You're my boy, Blue!",
-"Earmuffs."
-],
-"Forrest Gump":[
-"Life is like a box of chocolates.",
-"Run, Forrest, run!",
-"Stupid is as stupid does."
-],
-"The Sixth Sense":[
-"I see dead people.",
-"They don't know they're dead.",
-"I'm ready to tell you my secret now."
-],
-"The Godfather":[
-"I'm gonna make him an offer he can't refuse.",
-"Leave the gun. Take the cannoli.",
-"It's not personal. It's strictly business."
-]
+const quotes = {
+  "Rocky III":[
+    "There is no tomorrow!",
+    "You're gonna eat lightning and crap thunder!",
+    "The eye of the tiger, man."
+  ],
+  "Top Gun":[
+    "I feel the need—the need for speed.",
+    "You can be my wingman anytime.",
+    "Talk to me, Goose."
+  ],
+  "A Few Good Men":[
+    "You can't handle the truth!",
+    "I want the truth!",
+    "You're either with us or against us."
+  ],
+  "The Sandlot":[
+    "You're killing me, Smalls!",
+    "Heroes get remembered, but legends never die.",
+    "You're killing me, Smalls!"
+  ],
+  "Goodfellas":[
+    "As far back as I can remember, I always wanted to be a gangster."
+  ]
 };
 
-const app=document.getElementById("app");
-
 function escapeHtml(value){
-return String(value ?? "")
-.replace(/&/g,"&amp;")
-.replace(/</g,"&lt;")
-.replace(/>/g,"&gt;")
-.replace(/"/g,"&quot;")
-.replace(/'/g,"&#039;");
+  return String(value ?? "")
+    .replaceAll("&","&amp;")
+    .replaceAll("<","&lt;")
+    .replaceAll(">","&gt;")
+    .replaceAll('"',"&quot;")
+    .replaceAll("'","&#039;");
 }
 
-function posterHtml(movie){
-if(movie.poster_path){
-return `<img src="https://image.tmdb.org/t/p/w500${movie.poster_path}" alt="${escapeHtml(movie.title)}">`;
+function showLoading(){
+  app.innerHTML = `
+    <div class="page">
+      <div class="wrap">
+        <div class="loading">Loading…</div>
+      </div>
+    </div>
+  `;
 }
 
-return `<span>${escapeHtml(movie.icon || "🎬")} ${escapeHtml(movie.title)}</span>`;
+function showError(message){
+  app.innerHTML = `
+    <div class="page">
+      <div class="wrap">
+        <div class="error">${escapeHtml(message)}</div>
+      </div>
+    </div>
+  `;
+}
+
+function home(){
+
+  app.innerHTML = `
+    <div class="page">
+
+      <section class="hero wrap">
+
+        <div>
+          <div class="eyebrow">THE MOVIE DATABASE FOR MOVIE PEOPLE</div>
+
+          <h1>Know the movie.<br>Know the story.</h1>
+
+          <p>
+            Reelwise brings movies, stars, quotes, connections and
+            the stories behind the screen together in one place.
+          </p>
+
+          <button class="cta" onclick="page('discover')">
+            Explore Reelwise
+          </button>
+        </div>
+
+        <div class="heroCard">
+          <div class="eyebrow">FEATURED</div>
+          <b>Rocky III</b>
+          <div class="muted">1982 · Drama · Sports</div>
+          <p>
+            The Eye of the Tiger. Clubber Lang. Thunderlips.
+            There's a lot more to the movie than the final fight.
+          </p>
+        </div>
+
+      </section>
+
+      <section class="section wrap">
+
+        <div class="sectionhead">
+          <h2>Featured Movies</h2>
+          <span class="muted">Explore the Reelwise collection</span>
+        </div>
+
+        <div class="grid">
+          ${featuredMovies.map(movieCard).join("")}
+        </div>
+
+      </section>
+
+      <section class="section wrap">
+
+        <div class="sectionhead">
+          <h2>What makes Reelwise different?</h2>
+        </div>
+
+        <div class="feature">
+          <h3>🎬 Movies</h3>
+          <p>
+            Search movies and explore cast, stories, quotes and more.
+          </p>
+        </div>
+
+        <div class="feature">
+          <h3>⭐ Stars</h3>
+          <p>
+            Go beyond a basic biography and discover the movies,
+            careers and interesting facts behind Hollywood's biggest stars.
+          </p>
+        </div>
+
+        <div class="feature">
+          <h3>🔗 Six Degrees</h3>
+          <p>
+            Pick any two actors and Reelwise searches their film
+            careers to find a connection within six movies.
+          </p>
+        </div>
+
+      </section>
+
+    </div>
+  `;
 }
 
 function movieCard(movie){
-return `
-<article class="card" data-movie="${escapeHtml(movie.id)}">
-<div class="poster">
-${posterHtml(movie)}
-</div>
-<div class="info">
-<b>${escapeHtml(movie.title)}</b>
-<small>${escapeHtml(movie.year || "")} · ${escapeHtml(movie.genre || "")}</small>
-</div>
-</article>
-`;
+
+  return `
+    <div class="card"
+         onclick="searchMovie('${escapeHtml(movie.title).replaceAll("'","\\'")}')">
+
+      <div class="poster">
+        <span>${movie.icon}</span>
+      </div>
+
+      <div class="info">
+        <b>${escapeHtml(movie.title)}</b>
+        <small>${movie.year} · ${escapeHtml(movie.genre)}</small>
+      </div>
+
+    </div>
+  `;
 }
 
-function renderHome(){
+function discover(){
 
-app.innerHTML=`
-<div class="wrap page">
+  app.innerHTML = `
+    <div class="page">
+      <div class="wrap">
 
-<section class="hero">
+        <div class="sectionhead">
+          <h2>Discover</h2>
+        </div>
 
-<div>
-<div class="eyebrow">THE MOVIE DATABASE FOR MOVIE PEOPLE</div>
-<h1>Know the movie.<br>Know the story.</h1>
-<p>
-Reelwise brings movies, stars, quotes, stories and connections together in one place.
-</p>
-<button class="cta" data-page="discover">Explore Reelwise</button>
-</div>
+        <p class="muted">
+          Search the TMDB movie database for movies and stars.
+        </p>
 
-<div class="heroCard">
-<div class="eyebrow">REELWISE FEATURE</div>
-<b>Six Degrees</b>
-<p class="muted">
-Connect any two actors through the movies they've appeared in.
-</p>
-<button class="cta" data-page="sixdegrees">Play Six Degrees</button>
-</div>
+        <div class="feature">
+          <h3>Try the search above</h3>
+          <p>
+            Search for Rocky, Tom Cruise, Sylvester Stallone,
+            Top Gun, Goodfellas or thousands of other movies and stars.
+          </p>
+        </div>
 
-</section>
+        <div class="grid">
+          ${featuredMovies.map(movieCard).join("")}
+        </div>
 
-<section class="section">
-
-<div class="sectionhead">
-<h2>Featured Movies</h2>
-<span class="muted">More coming every day</span>
-</div>
-
-<div class="grid">
-${movies.map(movieCard).join("")}
-</div>
-
-</section>
-
-</div>
-`;
-
-bindCards();
+      </div>
+    </div>
+  `;
 }
 
-function renderDiscover(){
+function stars(){
 
-app.innerHTML=`
-<div class="wrap page">
+  app.innerHTML = `
+    <div class="page">
+      <div class="wrap">
 
-<button class="back" data-page="home">← Back to home</button>
+        <div class="sectionhead">
+          <h2>Stars</h2>
+        </div>
 
-<section class="section">
-<div class="sectionhead">
-<h2>Discover</h2>
-</div>
+        <div class="feature">
+          <h3>Search for any star</h3>
+          <p>
+            Use the search bar above to find actors and actresses
+            from the TMDB database.
+          </p>
+        </div>
 
-<div class="feature">
-<h3>Search the movie universe</h3>
-<p>
-Use the search box above to find movies and stars through TMDB.
-</p>
-</div>
+        <div class="grid">
 
-<div class="grid">
-${movies.map(movieCard).join("")}
-</div>
+          ${[
+            "Tom Cruise",
+            "Sylvester Stallone",
+            "Robert De Niro",
+            "Jack Nicholson",
+            "Demi Moore"
+          ].map(name => `
+            <div class="card"
+                 onclick="searchPerson('${name.replaceAll("'","\\'")}')">
 
-</section>
-</div>
-`;
+              <div class="poster">
+                <span>⭐</span>
+              </div>
 
-bindCards();
+              <div class="info">
+                <b>${name}</b>
+                <small>Explore star</small>
+              </div>
+
+            </div>
+          `).join("")}
+
+        </div>
+
+      </div>
+    </div>
+  `;
 }
 
-function renderStars(){
+function stories(){
 
-app.innerHTML=`
-<div class="wrap page">
+  app.innerHTML = `
+    <div class="page">
+      <div class="wrap">
 
-<section class="section">
+        <div class="sectionhead">
+          <h2>Movie Stories</h2>
+        </div>
 
-<div class="sectionhead">
-<h2>Stars</h2>
-<span class="muted">Search for any actor above</span>
-</div>
+        <div class="feature">
+          <h3>🥊 Rocky III</h3>
+          <p>
+            The legendary fight between Rocky Balboa and Clubber Lang
+            is only part of the story. The production, casting and
+            behind-the-scenes moments are just as interesting.
+          </p>
+        </div>
 
-<div class="feature">
-<h3>Movie stars are the heart of Reelwise.</h3>
-<p>
-Search for Tom Cruise, Sylvester Stallone, Robert De Niro, Demi Moore,
-Val Kilmer or thousands of other actors.
-</p>
-</div>
+        <div class="feature">
+          <h3>✈️ Top Gun</h3>
+          <p>
+            Tom Cruise, Val Kilmer and the cast helped turn Top Gun
+            into one of the defining movies of the 1980s.
+          </p>
+        </div>
 
-</section>
+        <div class="feature">
+          <h3>⚖️ A Few Good Men</h3>
+          <p>
+            One courtroom scene created one of the most famous movie
+            quotes of all time.
+          </p>
+        </div>
 
-</div>
-`;
+      </div>
+    </div>
+  `;
 }
 
-function renderStories(){
+function sixDegrees(){
 
-app.innerHTML=`
-<div class="wrap page">
+  app.innerHTML = `
+    <div class="page">
 
-<section class="section">
+      <div class="wrap degreeBox">
 
-<div class="sectionhead">
-<h2>Stories</h2>
-</div>
+        <div class="sectionhead">
+          <h2>Six Degrees</h2>
+        </div>
 
-${movies.map(movie=>`
-<div class="feature">
-<div class="eyebrow">${escapeHtml(movie.year)}</div>
-<h3>${escapeHtml(movie.title)}</h3>
-<p>${escapeHtml(movie.story)}</p>
-</div>
-`).join("")}
+        <p class="muted">
+          Can any two actors be connected through six movies or fewer?
+        </p>
 
-</section>
+        <form class="degreeForm" id="degreeForm">
 
-</div>
-`;
+          <input
+            id="degreeFrom"
+            placeholder="First actor"
+            autocomplete="off">
+
+          <input
+            id="degreeTo"
+            placeholder="Second actor"
+            autocomplete="off">
+
+          <button type="submit">Find Connection</button>
+
+        </form>
+
+        <div id="degreeOutput"></div>
+
+      </div>
+
+    </div>
+  `;
+
+  document
+    .getElementById("degreeForm")
+    .addEventListener("submit", findDegrees);
 }
 
-function renderSixDegrees(){
+async function findDegrees(event){
 
-app.innerHTML=`
-<div class="wrap page">
+  event.preventDefault();
 
-<button class="back" data-page="home">← Back to home</button>
+  const from = document.getElementById("degreeFrom").value.trim();
+  const to = document.getElementById("degreeTo").value.trim();
+  const output = document.getElementById("degreeOutput");
 
-<div class="degreeBox">
+  if(!from || !to){
+    output.innerHTML = `<div class="error">Enter two actor names.</div>`;
+    return;
+  }
 
-<div class="eyebrow">THE REELWISE GAME</div>
+  output.innerHTML = `<div class="loading">Finding the connection…</div>`;
 
-<h1>Six Degrees</h1>
+  try{
 
-<p class="muted">
-Connect any two actors through the movies they've appeared in.
-The connection can be up to six movie steps.
-</p>
+    const response = await fetch(
+      `/api/search?type=degrees&from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`
+    );
 
-<form class="degreeForm" id="degreeForm">
+    const data = await response.json();
 
-<input
-id="degreeFrom"
-placeholder="First actor"
-autocomplete="off">
+    if(!response.ok){
+      throw new Error(data.error || "Unable to find connection.");
+    }
 
-<input
-id="degreeTo"
-placeholder="Second actor"
-autocomplete="off">
+    if(!data.path || !data.path.length){
+      output.innerHTML = `
+        <div class="error">
+          We couldn't find a connection between
+          ${escapeHtml(from)} and ${escapeHtml(to)}
+          within six degrees.
+        </div>
+      `;
+      return;
+    }
 
-<button type="submit">Connect</button>
+    renderDegrees(data);
 
-</form>
+  }catch(error){
 
-<div id="degreeOutput"></div>
-
-</div>
-
-</div>
-`;
-
-document
-.getElementById("degreeForm")
-.addEventListener("submit",runDegrees);
+    output.innerHTML = `
+      <div class="error">
+        ${escapeHtml(error.message)}
+      </div>
+    `;
+  }
 }
 
-async function runDegrees(event){
+function renderDegrees(data){
 
-event.preventDefault();
+  const output = document.getElementById("degreeOutput");
 
-const from=document
-.getElementById("degreeFrom")
-.value
-.trim();
+  const path = data.path || [];
 
-const to=document
-.getElementById("degreeTo")
-.value
-.trim();
+  let html = `
+    <div class="degreeResult">
 
-const output=document.getElementById("degreeOutput");
+      <div class="degreeTitle">
+        ${escapeHtml(data.from?.name || "Actor")}
+        → 
+        ${escapeHtml(data.to?.name || "Actor")}
+      </div>
+  `;
 
-if(!from || !to){
+  path.forEach((step,index)=>{
 
-output.innerHTML=`
-<div class="error">
-Please enter two actor names.
-</div>
-`;
+    if(step.person){
 
-return;
+      html += `
+        <div class="connection">
+
+          <div class="connectionActor">
+            ${escapeHtml(step.person.name)}
+          </div>
+
+          ${
+            step.movie
+            ? `
+              <div class="connectionMovie">
+                ${escapeHtml(step.movie.title)}
+                ${step.movie.year ? ` (${escapeHtml(step.movie.year)})` : ""}
+              </div>
+            `
+            : ""
+          }
+
+        </div>
+      `;
+
+      if(index < path.length - 1){
+        html += `<div class="connectionArrow">↓</div>`;
+      }
+    }
+
+  });
+
+  html += `</div>`;
+
+  output.innerHTML = html;
 }
 
-if(from.toLowerCase()===to.toLowerCase()){
+async function searchSite(query){
 
-output.innerHTML=`
-<div class="error">
-Choose two different actors.
-</div>
-`;
+  query = query.trim();
 
-return;
+  if(!query){
+    return;
+  }
+
+  showLoading();
+
+  try{
+
+    const response = await fetch(
+      `/api/search?q=${encodeURIComponent(query)}`
+    );
+
+    const data = await response.json();
+
+    if(!response.ok){
+      throw new Error(data.error || "Search failed.");
+    }
+
+    /*
+      IMPORTANT:
+      The API now returns:
+      
+      {
+        results: [...],
+        movies: [...],
+        people: [...]
+      }
+
+      The search page uses RESULTS directly.
+    */
+
+    const results = Array.isArray(data.results)
+      ? data.results
+      : [
+          ...(data.movies || []).map(movie => ({
+            ...movie,
+            result_type:"movie"
+          })),
+          ...(data.people || []).map(person => ({
+            ...person,
+            result_type:"person"
+          }))
+        ];
+
+    renderSearchResults(query,results);
+
+  }catch(error){
+
+    showError(error.message || "Search failed.");
+  }
 }
 
-output.innerHTML=`
-<div class="loading">
-Finding the connection…
-</div>
-`;
+function renderSearchResults(query,results){
 
-try{
+  if(!results.length){
 
-const response=await fetch(
-`/api/search?type=degrees&from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`
-);
+    app.innerHTML = `
+      <div class="page">
+        <div class="wrap">
 
-const data=await response.json();
+          <button class="back" onclick="home()">← Back</button>
 
-if(!response.ok){
+          <h2>No results for "${escapeHtml(query)}"</h2>
 
-throw new Error(
-data.error ||
-data.message ||
-"Could not find the connection."
-);
+          <div class="empty">
+            Try another movie or star.
+          </div>
 
+        </div>
+      </div>
+    `;
+
+    return;
+  }
+
+  app.innerHTML = `
+    <div class="page">
+
+      <div class="wrap">
+
+        <button class="back" onclick="home()">← Back</button>
+
+        <h2>Search results for "${escapeHtml(query)}"</h2>
+
+        <div class="resultList">
+
+          ${results.map(result => {
+
+            const type =
+              result.result_type ||
+              (result.title ? "movie" : "person");
+
+            if(type === "person"){
+
+              return `
+                <div
+                  class="result"
+                  onclick="openPerson(${Number(result.id)})">
+
+                  <div>
+                    <div class="resultTitle">
+                      ${escapeHtml(result.name)}
+                    </div>
+
+                    <div class="muted">
+                      Actor / Star
+                    </div>
+                  </div>
+
+                  <div class="resultType">
+                    Star
+                  </div>
+
+                </div>
+              `;
+            }
+
+            return `
+              <div
+                class="result"
+                onclick="openMovie(${Number(result.id)})">
+
+                <div>
+                  <div class="resultTitle">
+                    ${escapeHtml(
+                      result.title ||
+                      result.original_title ||
+                      result.display_title ||
+                      "Untitled"
+                    )}
+                  </div>
+
+                  <div class="muted">
+                    ${escapeHtml(result.release_date || "")}
+                  </div>
+                </div>
+
+                <div class="resultType">
+                  Movie
+                </div>
+
+              </div>
+            `;
+
+          }).join("")}
+
+        </div>
+
+      </div>
+
+    </div>
+  `;
 }
 
-if(!data.path || !Array.isArray(data.path) || data.path.length===0){
+async function searchMovie(title){
 
-throw new Error("We couldn't find that connection.");
-}
-
-renderDegreeResult(data);
-
-}catch(error){
-
-output.innerHTML=`
-<div class="error">
-${escapeHtml(error.message || "We couldn't find that connection.")}
-</div>
-`;
-}
-}
-
-function renderDegreeResult(data){
-
-const output=document.getElementById("degreeOutput");
-
-const path=Array.isArray(data.path) ? data.path : [];
-
-if(!path.length){
-
-output.innerHTML=`
-<div class="error">
-We couldn't find that connection.
-</div>
-`;
-
-return;
-}
-
-const firstPerson=
-data.from?.name ||
-path[0]?.person?.name ||
-"Actor";
-
-const lastPerson=
-data.to?.name ||
-path[path.length-1]?.person?.name ||
-"Actor";
-
-let html=`
-<div class="degreeResult">
-
-<div class="degreeTitle">
-${escapeHtml(firstPerson)}
-→
-${escapeHtml(lastPerson)}
-</div>
-`;
-
-let lastActor=null;
-
-for(const step of path){
-
-const person=step?.person;
-
-if(!person || !person.name){
-continue;
-}
-
-const actorName=person.name;
-
-if(lastActor){
-
-html+=`
-<div class="connectionArrow">↓</div>
-`;
-}
-
-html+=`
-<div class="connection">
-<div class="connectionActor">
-${escapeHtml(actorName)}
-</div>
-`;
-
-if(step.movie && step.movie.title){
-
-const movieTitle=step.movie.title;
-const movieYear=step.movie.year
-? ` (${escapeHtml(step.movie.year)})`
-: "";
-
-html+=`
-<div class="connectionMovie">
-🎬 ${escapeHtml(movieTitle)}${movieYear}
-</div>
-`;
-}
-
-html+=`
-</div>
-`;
-
-lastActor=actorName;
-}
-
-html+=`
-</div>
-`;
-
-output.innerHTML=html;
-}
-
-function bindCards(){
-
-document
-.querySelectorAll("[data-movie]")
-.forEach(card=>{
-
-card.addEventListener("click",()=>{
-
-const id=card.dataset.movie;
-
-const movie=movies.find(item=>item.id===id);
-
-if(movie){
-renderMovie(movie);
-}
-
-});
-
-});
-}
-
-function renderMovie(movie){
-
-app.innerHTML=`
-<div class="wrap page">
-
-<button class="back" data-page="home">← Back to home</button>
-
-<div class="detail">
-
-<div class="detailposter">
-${posterHtml(movie)}
-</div>
-
-<div>
-
-<div class="eyebrow">${escapeHtml(movie.year)}</div>
-
-<h1>${escapeHtml(movie.title)}</h1>
-
-<p class="muted">
-${escapeHtml(movie.genre)}
-</p>
-
-<div class="feature">
-<h3>Behind the Movie</h3>
-<p>${escapeHtml(movie.story)}</p>
-</div>
-
-<section class="section">
-
-<h2>Cast</h2>
-
-<div class="cast">
-
-${movie.cast.map(actor=>`
-<button
-class="actorButton"
-data-actor="${escapeHtml(actor)}">
-${escapeHtml(actor)}
-</button>
-`).join("")}
-
-</div>
-
-</section>
-
-<section class="section">
-
-<h2>Quotes</h2>
-
-<div class="feature">
-
-${
-(quotes[movie.title] || [])
-.map(q=>`
-<div class="quote">“${escapeHtml(q)}”</div>
-`)
-.join("")
-|| `<div class="muted">Quotes coming soon.</div>`
-}
-
-</div>
-
-</section>
-
-</div>
-
-</div>
-
-</div>
-`;
-
-document
-.querySelectorAll(".actorButton")
-.forEach(button=>{
-
-button.addEventListener("click",()=>{
-
-searchPerson(button.dataset.actor);
-
-});
-
-});
-
-}
-
-async function searchTMDB(query){
-
-const response=await fetch(
-`/api/search?q=${encodeURIComponent(query)}`
-);
-
-if(!response.ok){
-
-throw new Error("Search failed.");
-
-}
-
-return response.json();
+  await searchSite(title);
 }
 
 async function searchPerson(name){
 
-app.innerHTML=`
-<div class="wrap page">
-<div class="loading">
-Loading ${escapeHtml(name)}…
-</div>
-</div>
-`;
-
-try{
-
-const data=await searchTMDB(name);
-
-const people=data.people || data.results || [];
-
-const person=people.find(
-item=>item.known_for_department==="Acting"
-) || people[0];
-
-if(!person){
-
-throw new Error("Actor not found.");
+  await searchSite(name);
 }
 
-renderPerson(person);
+async function openMovie(id){
 
-}catch(error){
+  showLoading();
 
-app.innerHTML=`
-<div class="wrap page">
+  try{
 
-<button class="back" data-page="home">← Back to home</button>
+    const response = await fetch(
+      `/api/search?type=movie&id=${encodeURIComponent(id)}`
+    );
 
-<div class="error">
-${escapeHtml(error.message)}
-</div>
+    const movie = await response.json();
 
-</div>
-`;
+    if(!response.ok){
+      throw new Error(movie.error || "Unable to load movie.");
+    }
+
+    renderMovie(movie);
+
+  }catch(error){
+
+    showError(error.message);
+  }
 }
+
+function renderMovie(movie){
+
+  const poster = movie.poster_path
+    ? `https://image.tmdb.org/t/p/w500${movie.poster_path}`
+    : "";
+
+  const cast = movie.credits?.cast || [];
+
+  app.innerHTML = `
+    <div class="page">
+
+      <div class="wrap">
+
+        <button class="back" onclick="history.back()">← Back</button>
+
+        <div class="detail">
+
+          <div class="detailposter">
+
+            ${
+              poster
+              ? `<img src="${poster}" alt="">`
+              : ""
+            }
+
+          </div>
+
+          <div>
+
+            <div class="eyebrow">MOVIE</div>
+
+            <h1>
+              ${escapeHtml(movie.title || "Untitled")}
+            </h1>
+
+            <div class="personMeta">
+
+              ${
+                movie.release_date
+                ? `<span>${escapeHtml(movie.release_date)}</span>`
+                : ""
+              }
+
+              ${
+                movie.runtime
+                ? `<span>${movie.runtime} min</span>`
+                : ""
+              }
+
+              ${
+                movie.vote_average
+                ? `<span>⭐ ${Number(movie.vote_average).toFixed(1)}</span>`
+                : ""
+              }
+
+            </div>
+
+            <p class="muted">
+              ${escapeHtml(movie.overview || "No overview available.")}
+            </p>
+
+            <div class="section">
+
+              <h2>Cast</h2>
+
+              <div class="cast">
+
+                ${cast.slice(0,20).map(person => `
+                  <button onclick="openPerson(${Number(person.id)})">
+                    ${escapeHtml(person.name)}
+                  </button>
+                `).join("")}
+
+              </div>
+
+            </div>
+
+            ${
+              quotes[movie.title]
+              ? `
+                <div class="section">
+
+                  <h2>Quotes</h2>
+
+                  ${quotes[movie.title]
+                    .map(q => `<div class="quote">“${escapeHtml(q)}”</div>`)
+                    .join("")}
+
+                </div>
+              `
+              : ""
+            }
+
+          </div>
+
+        </div>
+
+      </div>
+
+    </div>
+  `;
+}
+
+async function openPerson(id){
+
+  showLoading();
+
+  try{
+
+    const response = await fetch(
+      `/api/search?type=person&id=${encodeURIComponent(id)}`
+    );
+
+    const person = await response.json();
+
+    if(!response.ok){
+      throw new Error(person.error || "Unable to load star.");
+    }
+
+    renderPerson(person);
+
+  }catch(error){
+
+    showError(error.message);
+  }
 }
 
 function renderPerson(person){
 
-const photo=person.profile_path
-? `https://image.tmdb.org/t/p/w500${person.profile_path}`
-: "";
+  const photo = person.profile_path
+    ? `https://image.tmdb.org/t/p/w500${person.profile_path}`
+    : "";
 
-app.innerHTML=`
-<div class="wrap page">
+  const credits =
+    person.movie_credits?.cast ||
+    person.combined_credits?.cast ||
+    [];
 
-<button class="back" data-page="home">← Back to home</button>
+  app.innerHTML = `
+    <div class="page">
 
-<div class="personHero">
+      <div class="wrap">
 
-<div
-class="personPhoto"
-style="${photo ? `background-image:url('${photo}')` : ""}">
-${photo ? "" : "★"}
-</div>
+        <button class="back" onclick="history.back()">← Back</button>
 
-<div class="personIntro">
+        <div class="personHero">
 
-<div class="eyebrow">REELWISE STAR</div>
+          <div
+            class="personPhoto"
+            ${photo ? `style="background-image:url('${photo}')"` : ""}
+          >
+            ${photo ? "" : "⭐"}
+          </div>
 
-<h1>${escapeHtml(person.name)}</h1>
+          <div class="personIntro">
 
-<div class="personMeta">
-<span>Actor</span>
-${person.known_for_department
-? `<span>${escapeHtml(person.known_for_department)}</span>`
-: ""}
-</div>
+            <div class="eyebrow">STAR</div>
 
-<p>
-${escapeHtml(
-person.biography ||
-"Biography information coming soon."
-)}
-</p>
+            <h1>
+              ${escapeHtml(person.name || "Unknown")}
+            </h1>
 
-<div class="facts">
+            <div class="personMeta">
 
-<div class="fact">
-<b>${escapeHtml(person.name)}</b>
-<small>Star</small>
-</div>
+              ${
+                person.birthday
+                ? `<span>Born ${escapeHtml(person.birthday)}</span>`
+                : ""
+              }
 
-<div class="fact">
-<b>TMDB</b>
-<small>Movie database</small>
-</div>
+              ${
+                person.place_of_birth
+                ? `<span>${escapeHtml(person.place_of_birth)}</span>`
+                : ""
+              }
 
-<div class="fact">
-<b>Reelwise</b>
-<small>Movie stories</small>
-</div>
+            </div>
 
-</div>
+            <p>
+              ${escapeHtml(
+                person.biography ||
+                "Biography information is not available."
+              )}
+            </p>
 
-</div>
+            <div class="facts">
 
-</div>
+              <div class="fact">
+                <b>${credits.length}</b>
+                <small>Known credits</small>
+              </div>
 
-</div>
-`;
+              <div class="fact">
+                <b>⭐</b>
+                <small>Movie star</small>
+              </div>
+
+              <div class="fact">
+                <b>Reelwise</b>
+                <small>Star profile</small>
+              </div>
+
+            </div>
+
+          </div>
+
+        </div>
+
+        <section class="section">
+
+          <h2>Movies</h2>
+
+          <div class="resultList">
+
+            ${credits
+              .filter(movie => movie.title)
+              .slice(0,30)
+              .map(movie => `
+                <div
+                  class="result"
+                  onclick="openMovie(${Number(movie.id)})">
+
+                  <div>
+                    <div class="resultTitle">
+                      ${escapeHtml(movie.title)}
+                    </div>
+
+                    <div class="muted">
+                      ${
+                        movie.release_date
+                        ? escapeHtml(movie.release_date)
+                        : ""
+                      }
+                    </div>
+                  </div>
+
+                  <div class="resultType">
+                    Movie
+                  </div>
+
+                </div>
+              `)
+              .join("")}
+
+          </div>
+
+        </section>
+
+      </div>
+
+    </div>
+  `;
 }
 
-async function performSearch(query){
+function page(name){
 
-app.innerHTML=`
-<div class="wrap page">
-<div class="loading">
-Searching for “${escapeHtml(query)}”…
-</div>
-</div>
-`;
-
-try{
-
-const data=await searchTMDB(query);
-
-const results=data.results || [];
-
-if(!results.length){
-
-app.innerHTML=`
-<div class="wrap page">
-
-<button class="back" data-page="home">← Back to home</button>
-
-<div class="empty">
-No results found for “${escapeHtml(query)}”.
-</div>
-
-</div>
-`;
-
-return;
+  if(name === "home") home();
+  else if(name === "discover") discover();
+  else if(name === "stars") stars();
+  else if(name === "stories") stories();
+  else if(name === "sixdegrees") sixDegrees();
 }
 
-const people=results.filter(
-item=>item.media_type==="person"
-);
+document.querySelectorAll("[data-page]").forEach(button => {
 
-const films=results.filter(
-item=>item.media_type==="movie"
-);
-
-app.innerHTML=`
-<div class="wrap page">
-
-<button class="back" data-page="home">← Back to home</button>
-
-<h1>Search Results</h1>
-
-${
-people.length
-? `
-<section class="section">
-
-<h2>Stars</h2>
-
-<div class="resultList">
-
-${people.slice(0,10).map(person=>`
-
-<div
-class="result"
-data-person-id="${escapeHtml(person.id)}">
-
-<div>
-<b>${escapeHtml(person.name)}</b>
-<div class="muted">Actor</div>
-</div>
-
-<div>→</div>
-
-</div>
-
-`).join("")}
-
-</div>
-
-</section>
-`
-:""
-}
-
-${
-films.length
-? `
-<section class="section">
-
-<h2>Movies</h2>
-
-<div class="grid">
-
-${films.slice(0,10).map(movieCard).join("")}
-
-</div>
-
-</section>
-`
-:""
-}
-
-</div>
-`;
-
-bindCards();
-
-document
-.querySelectorAll("[data-person-id]")
-.forEach(item=>{
-
-item.addEventListener("click",()=>{
-
-const person=people.find(
-p=>String(p.id)===String(item.dataset.personId)
-);
-
-if(person){
-renderPerson(person);
-}
+  button.addEventListener("click",() => {
+    page(button.dataset.page);
+  });
 
 });
 
-});
+document.getElementById("logo").addEventListener("click",home);
 
-}catch(error){
+document.getElementById("searchForm").addEventListener("submit",event => {
 
-app.innerHTML=`
-<div class="wrap page">
+  event.preventDefault();
 
-<button class="back" data-page="home">← Back to home</button>
+  const query =
+    document.getElementById("searchInput").value.trim();
 
-<div class="error">
-Search failed. Please try again.
-</div>
-
-</div>
-`;
-}
-}
-
-document
-.getElementById("searchForm")
-.addEventListener("submit",event=>{
-
-event.preventDefault();
-
-const query=document
-.getElementById("searchInput")
-.value
-.trim();
-
-if(query){
-performSearch(query);
-}
+  searchSite(query);
 
 });
 
-document
-.querySelectorAll("[data-page]")
-.forEach(button=>{
-
-button.addEventListener("click",()=>{
-
-const page=button.dataset.page;
-
-if(page==="home") renderHome();
-if(page==="discover") renderDiscover();
-if(page==="stars") renderStars();
-if(page==="stories") renderStories();
-if(page==="sixdegrees") renderSixDegrees();
-
-});
-
-});
-
-document
-.getElementById("logo")
-.addEventListener("click",renderHome);
-
-renderHome();
+home();
 
 </script>
 
