@@ -627,24 +627,22 @@ const featuredMovies = [
 ];
 
 const quotes = {
+  "Rocky":[
+    "Yo, Adrian!",
+    "I did it!"
+  ],
   "Rocky III":[
     "There is no tomorrow!",
-    "You're gonna eat lightning and crap thunder!",
-    "The eye of the tiger, man."
+    "The eye of the tiger."
   ],
   "Top Gun":[
     "I feel the need—the need for speed.",
-    "You can be my wingman anytime.",
     "Talk to me, Goose."
   ],
   "A Few Good Men":[
-    "You can't handle the truth!",
-    "I want the truth!",
-    "You're either with us or against us."
+    "You can't handle the truth!"
   ],
   "The Sandlot":[
-    "You're killing me, Smalls!",
-    "Heroes get remembered, but legends never die.",
     "You're killing me, Smalls!"
   ],
   "Goodfellas":[
@@ -954,11 +952,13 @@ async function findDegrees(event){
   const output = document.getElementById("degreeOutput");
 
   if(!from || !to){
-    output.innerHTML = `<div class="error">Enter two actor names.</div>`;
+    output.innerHTML =
+      `<div class="error">Enter two actor names.</div>`;
     return;
   }
 
-  output.innerHTML = `<div class="loading">Finding the connection…</div>`;
+  output.innerHTML =
+    `<div class="loading">Finding the connection…</div>`;
 
   try{
 
@@ -1006,7 +1006,7 @@ function renderDegrees(data){
 
       <div class="degreeTitle">
         ${escapeHtml(data.from?.name || "Actor")}
-        → 
+        →
         ${escapeHtml(data.to?.name || "Actor")}
       </div>
   `;
@@ -1027,7 +1027,9 @@ function renderDegrees(data){
             ? `
               <div class="connectionMovie">
                 ${escapeHtml(step.movie.title)}
-                ${step.movie.year ? ` (${escapeHtml(step.movie.year)})` : ""}
+                ${step.movie.year
+                  ? ` (${escapeHtml(step.movie.year)})`
+                  : ""}
               </div>
             `
             : ""
@@ -1069,19 +1071,6 @@ async function searchSite(query){
     if(!response.ok){
       throw new Error(data.error || "Search failed.");
     }
-
-    /*
-      IMPORTANT:
-      The API now returns:
-      
-      {
-        results: [...],
-        movies: [...],
-        people: [...]
-      }
-
-      The search page uses RESULTS directly.
-    */
 
     const results = Array.isArray(data.results)
       ? data.results
@@ -1207,12 +1196,10 @@ function renderSearchResults(query,results){
 }
 
 async function searchMovie(title){
-
   await searchSite(title);
 }
 
 async function searchPerson(name){
-
   await searchSite(name);
 }
 
@@ -1222,8 +1209,14 @@ async function openMovie(id){
 
   try{
 
+    /*
+      FIX:
+      Ask the Reelwise API for the detailed movie record,
+      including credits.
+    */
+
     const response = await fetch(
-      `/api/search?type=movie&id=${encodeURIComponent(id)}`
+      `/api/search?type=movie-details&id=${encodeURIComponent(id)}`
     );
 
     const movie = await response.json();
@@ -1246,14 +1239,27 @@ function renderMovie(movie){
     ? `https://image.tmdb.org/t/p/w500${movie.poster_path}`
     : "";
 
-  const cast = movie.credits?.cast || [];
+  const cast =
+    movie.credits?.cast ||
+    [];
+
+  const movieTitle =
+    movie.title ||
+    movie.original_title ||
+    "Untitled";
+
+  const movieQuotes =
+    quotes[movieTitle] ||
+    [];
 
   app.innerHTML = `
     <div class="page">
 
       <div class="wrap">
 
-        <button class="back" onclick="history.back()">← Back</button>
+        <button class="back" onclick="history.back()">
+          ← Back
+        </button>
 
         <div class="detail">
 
@@ -1261,7 +1267,7 @@ function renderMovie(movie){
 
             ${
               poster
-              ? `<img src="${poster}" alt="">`
+              ? `<img src="${poster}" alt="${escapeHtml(movieTitle)}">`
               : ""
             }
 
@@ -1272,7 +1278,7 @@ function renderMovie(movie){
             <div class="eyebrow">MOVIE</div>
 
             <h1>
-              ${escapeHtml(movie.title || "Untitled")}
+              ${escapeHtml(movieTitle)}
             </h1>
 
             <div class="personMeta">
@@ -1298,40 +1304,107 @@ function renderMovie(movie){
             </div>
 
             <p class="muted">
-              ${escapeHtml(movie.overview || "No overview available.")}
+              ${escapeHtml(
+                movie.overview ||
+                "No overview available."
+              )}
             </p>
 
-            <div class="section">
-
-              <h2>Cast</h2>
-
-              <div class="cast">
-
-                ${cast.slice(0,20).map(person => `
-                  <button onclick="openPerson(${Number(person.id)})">
-                    ${escapeHtml(person.name)}
-                  </button>
-                `).join("")}
-
-              </div>
-
-            </div>
-
             ${
-              quotes[movie.title]
+              cast.length
               ? `
                 <div class="section">
 
-                  <h2>Quotes</h2>
+                  <h2>Cast</h2>
 
-                  ${quotes[movie.title]
-                    .map(q => `<div class="quote">“${escapeHtml(q)}”</div>`)
+                  <div class="cast">
+
+                    ${cast.slice(0,30).map(person => `
+                      <button
+                        onclick="openPerson(${Number(person.id)})">
+
+                        ${escapeHtml(person.name)}
+
+                        ${
+                          person.character
+                          ? ` — ${escapeHtml(person.character)}`
+                          : ""
+                        }
+
+                      </button>
+                    `).join("")}
+
+                  </div>
+
+                </div>
+              `
+              : `
+                <div class="section">
+                  <h2>Cast</h2>
+                  <p class="muted">
+                    Cast information is not available.
+                  </p>
+                </div>
+              `
+            }
+
+            ${
+              movieQuotes.length
+              ? `
+                <div class="section">
+
+                  <h2>Memorable Quotes</h2>
+
+                  ${movieQuotes
+                    .map(q => `
+                      <div class="quote">
+                        “${escapeHtml(q)}”
+                      </div>
+                    `)
                     .join("")}
 
                 </div>
               `
-              : ""
+              : `
+                <div class="section">
+
+                  <h2>Memorable Quotes</h2>
+
+                  <p class="muted">
+                    More memorable quotes coming to Reelwise.
+                  </p>
+
+                </div>
+              `
             }
+
+            <div class="section">
+
+              <h2>Movie Details</h2>
+
+              ${
+                movie.genres?.length
+                ? `
+                  <div class="personMeta">
+                    ${movie.genres.map(genre => `
+                      <span>${escapeHtml(genre.name)}</span>
+                    `).join("")}
+                  </div>
+                `
+                : ""
+              }
+
+              ${
+                movie.tagline
+                ? `
+                  <div class="feature">
+                    <h3>“${escapeHtml(movie.tagline)}”</h3>
+                  </div>
+                `
+                : ""
+              }
+
+            </div>
 
           </div>
 
@@ -1356,7 +1429,10 @@ async function openPerson(id){
     const person = await response.json();
 
     if(!response.ok){
-      throw new Error(person.error || "Unable to load star.");
+      throw new Error(
+        person.error ||
+        "Unable to load star."
+      );
     }
 
     renderPerson(person);
@@ -1383,13 +1459,19 @@ function renderPerson(person){
 
       <div class="wrap">
 
-        <button class="back" onclick="history.back()">← Back</button>
+        <button class="back" onclick="history.back()">
+          ← Back
+        </button>
 
         <div class="personHero">
 
           <div
             class="personPhoto"
-            ${photo ? `style="background-image:url('${photo}')"` : ""}
+            ${
+              photo
+              ? `style="background-image:url('${photo}')"`
+              : ""
+            }
           >
             ${photo ? "" : "⭐"}
           </div>
@@ -1501,6 +1583,7 @@ function page(name){
   else if(name === "stars") stars();
   else if(name === "stories") stories();
   else if(name === "sixdegrees") sixDegrees();
+
 }
 
 document.querySelectorAll("[data-page]").forEach(button => {
@@ -1511,18 +1594,24 @@ document.querySelectorAll("[data-page]").forEach(button => {
 
 });
 
-document.getElementById("logo").addEventListener("click",home);
+document.getElementById("logo").addEventListener(
+  "click",
+  home
+);
 
-document.getElementById("searchForm").addEventListener("submit",event => {
+document.getElementById("searchForm").addEventListener(
+  "submit",
+  event => {
 
-  event.preventDefault();
+    event.preventDefault();
 
-  const query =
-    document.getElementById("searchInput").value.trim();
+    const query =
+      document.getElementById("searchInput").value.trim();
 
-  searchSite(query);
+    searchSite(query);
 
-});
+  }
+);
 
 home();
 
