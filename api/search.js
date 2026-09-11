@@ -153,12 +153,19 @@ export default async function handler(req, res) {
     );
 
     const cast = (data.cast || [])
-      .filter(
-        (person) =>
-          person.id &&
-          person.name
-      )
-      .slice(0, 100);
+  .filter((person) => {
+    if (!person.id || !person.name) return false;
+
+    const character = (person.character || "").trim().toLowerCase();
+
+    if (!character) return false;
+    if (/^(self|himself|herself|themselves)$/.test(character)) return false;
+    if (character.includes("archive footage")) return false;
+    if (character.includes("archival footage")) return false;
+
+    return true;
+  })
+  .slice(0, 100);
 
     movieCastCache.set(movieId, cast);
 
