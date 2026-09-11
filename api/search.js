@@ -274,7 +274,7 @@ export default async function handler(req, res) {
     ])
   );
 
-  const directMovie = startMovies.find((movie) =>
+  
     targetMovieIds.has(movie.id)
   );
 
