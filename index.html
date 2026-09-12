@@ -704,4 +704,1005 @@ function showError(message){
   app.innerHTML = `
     <div class="page">
       <div class="wrap">
-        <div class="error">${
+        <div class="error">${escapeHtml(message)}</div>
+      </div>
+    </div>
+  `;
+}
+
+function moviePoster(path,title){
+  if(path){
+    return `
+      <img
+        src="https://image.tmdb.org/t/p/w500${escapeHtml(path)}"
+        alt="${escapeHtml(title)}">
+    `;
+  }
+
+  return `<span>${escapeHtml(title)}</span>`;
+}
+
+function renderHome(){
+  app.innerHTML = `
+    <div class="page">
+
+      <div class="wrap">
+
+        <section class="hero">
+
+          <div>
+            <div class="eyebrow">WELCOME TO REELWISE</div>
+            <h1>Know the movie.<br>Know the story.</h1>
+            <p>
+              Explore movies, stars, memorable quotes, stories and
+              the connections between Hollywood's biggest names.
+            </p>
+            <button class="cta" onclick="showPage('sixdegrees')">
+              Play Six Degrees
+            </button>
+          </div>
+
+          <div class="heroCard">
+            <div class="eyebrow">WHAT MAKES REELWISE DIFFERENT?</div>
+            <b>Movies are more than a database.</b>
+            <p class="muted">
+              Discover the people, quotes, stories and connections
+              behind the movies you love.
+            </p>
+          </div>
+
+        </section>
+
+        <section class="section">
+
+          <div class="sectionhead">
+            <h2>Featured Movies</h2>
+          </div>
+
+          <div class="grid">
+            ${featuredMovies.map(movie => `
+              <div class="card"
+                   onclick="searchAndOpenMovie('${escapeHtml(movie.title)}')">
+
+                <div class="poster">
+                  <span>${movie.icon} ${escapeHtml(movie.title)}</span>
+                </div>
+
+                <div class="info">
+                  <b>${escapeHtml(movie.title)}</b>
+                  <small>${movie.year} · ${escapeHtml(movie.genre)}</small>
+                </div>
+
+              </div>
+            `).join("")}
+          </div>
+
+        </section>
+
+      </div>
+    </div>
+  `;
+}
+
+async function searchAndOpenMovie(title){
+  showLoading();
+
+  try{
+    const response = await fetch(
+      `/api/search?q=${encodeURIComponent(title)}`
+    );
+
+    const data = await response.json();
+
+    const movie =
+      (data.movies || []).find(
+        m => String(m.title).toLowerCase() === title.toLowerCase()
+      ) ||
+      (data.results || []).find(
+        m =>
+          m.media_type === "movie" &&
+          String(m.title).toLowerCase() === title.toLowerCase()
+      );
+
+    if(!movie){
+      throw new Error("Movie not found.");
+    }
+
+    openMovie(movie.id);
+
+  }catch(error){
+    showError(error.message);
+  }
+}
+
+async function performSearch(query){
+
+  if(!query.trim()) return;
+
+  showLoading();
+
+  try{
+
+    const response = await fetch(
+      `/api/search?q=${encodeURIComponent(query)}`
+    );
+
+    const data = await response.json();
+
+    if(!response.ok){
+      throw new Error(data.error || "Search failed.");
+    }
+
+    renderSearchResults(data);
+
+  }catch(error){
+    showError(error.message);
+  }
+}
+
+function renderSearchResults(data){
+
+  const results = data.results || [];
+
+  if(!results.length){
+    app.innerHTML = `
+      <div class="page">
+        <div class="wrap">
+          <div class="empty">
+            <h2>No results found</h2>
+            <p class="muted">
+              Try another movie or star.
+            </p>
+          </div>
+        </div>
+      </div>
+    `;
+    return;
+  }
+
+  app.innerHTML = `
+    <div class="page">
+      <div class="wrap">
+
+        <button class="back" onclick="renderHome()">
+          ← Back to Reelwise
+        </button>
+
+        <h1>Search Results</h1>
+
+        <div class="resultList">
+
+          ${results.map(item => {
+
+            const isPerson = item.media_type === "person";
+            const title = isPerson ? item.name : item.title;
+            const date = isPerson
+              ? "Star"
+              : (item.release_date || "").slice(0,4);
+
+            return `
+              <div class="result"
+                   onclick="${
+                     isPerson
+                     ? `openPerson(${item.id})`
+                     : `openMovie(${item.id})`
+                   }">
+
+                <div>
+                  <div class="resultTitle">
+                    ${escapeHtml(title)}
+                  </div>
+
+                  <div class="muted">
+                    ${escapeHtml(date)}
+                  </div>
+                </div>
+
+                <div class="resultType">
+                  ${isPerson ? "Star" : "Movie"}
+                </div>
+
+              </div>
+            `;
+
+          }).join("")}
+
+        </div>
+
+      </div>
+    </div>
+  `;
+}
+
+async function openMovie(id){
+
+  showLoading();
+
+  try{
+
+    const response = await fetch(
+      `/api/search?type=movie-details&id=${encodeURIComponent(id)}`
+    );
+
+    const movie = await response.json();
+
+    if(!response.ok){
+      throw new Error(movie.error || "Could not load movie.");
+    }
+
+    renderMovie(movie);
+
+  }catch(error){
+    showError(error.message);
+  }
+}
+
+function renderMovie(movie){
+
+  const cast =
+    movie.credits?.cast ||
+    [];
+
+  const movieQuotes =
+    quotes[movie.title] ||
+    [];
+
+  const year =
+    (movie.release_date || "").slice(0,4);
+
+  app.innerHTML = `
+    <div class="page">
+      <div class="wrap">
+
+        <button class="back" onclick="renderHome()">
+          ← Back
+        </button>
+
+        <div class="detail">
+
+          <div class="detailposter">
+            ${moviePoster(movie.poster_path,movie.title)}
+          </div>
+
+          <div>
+
+            <div class="eyebrow">
+              ${escapeHtml(year)}
+            </div>
+
+            <h1>${escapeHtml(movie.title)}</h1>
+
+            <p class="muted">
+              ${escapeHtml(movie.overview || "No overview available.")}
+            </p>
+
+            <div class="facts">
+
+              <div class="fact">
+                <b>${movie.runtime || "—"}</b>
+                <small>Minutes</small>
+              </div>
+
+              <div class="fact">
+                <b>${movie.vote_average ? movie.vote_average.toFixed(1) : "—"}</b>
+                <small>Rating</small>
+              </div>
+
+              <div class="fact">
+                <b>${cast.length}</b>
+                <small>Cast Members</small>
+              </div>
+
+            </div>
+
+          </div>
+
+        </div>
+
+        <section class="section">
+
+          <div class="sectionhead">
+            <h2>Entire Cast</h2>
+          </div>
+
+          <div class="cast">
+
+            ${cast.map(person => `
+              <button onclick="openPerson(${person.id})">
+                ${escapeHtml(person.name)}
+                ${
+                  person.character
+                  ? ` · ${escapeHtml(person.character)}`
+                  : ""
+                }
+              </button>
+            `).join("")}
+
+          </div>
+
+        </section>
+
+        <section class="section">
+
+          <div class="sectionhead">
+            <h2>Memorable Quotes</h2>
+          </div>
+
+          ${
+            movieQuotes.length
+            ? movieQuotes.map(q => `
+                <div class="quote">
+                  “${escapeHtml(q)}”
+                </div>
+              `).join("")
+            : `
+              <div class="empty">
+                <p class="muted">
+                  More memorable quotes coming to Reelwise.
+                </p>
+              </div>
+            `
+          }
+
+        </section>
+
+      </div>
+    </div>
+  `;
+}
+
+async function openPerson(id){
+
+  showLoading();
+
+  try{
+
+    const response = await fetch(
+      `/api/search?type=person-details&id=${encodeURIComponent(id)}`
+    );
+
+    const person = await response.json();
+
+    if(!response.ok){
+      throw new Error(person.error || "Could not load star.");
+    }
+
+    renderPerson(person);
+
+  }catch(error){
+    showError(error.message);
+  }
+}
+
+function renderPerson(person){
+
+  const credits =
+    person.combined_credits?.cast ||
+    person.movie_credits?.cast ||
+    [];
+
+  const actingCredits = [];
+  const selfCredits = [];
+
+  credits.forEach(credit => {
+
+    const character =
+      String(credit.character || "").trim();
+
+    const isSelf =
+      /^self\b/i.test(character) ||
+      /^himself\b/i.test(character) ||
+      /^herself\b/i.test(character) ||
+      /^themselves\b/i.test(character);
+
+    const isArchive =
+      /archive footage/i.test(character);
+
+    if(isArchive) return;
+
+    if(isSelf){
+      selfCredits.push(credit);
+    }else{
+      actingCredits.push(credit);
+    }
+
+  });
+
+  const uniqueActing = uniqueCredits(actingCredits);
+  const uniqueSelf = uniqueCredits(selfCredits);
+
+  const profilePhoto =
+    person.profile_path
+      ? `https://image.tmdb.org/t/p/w500${person.profile_path}`
+      : "";
+
+  const birthday =
+    person.birthday
+      ? formatDate(person.birthday)
+      : "—";
+
+  const deathday =
+    person.deathday
+      ? formatDate(person.deathday)
+      : "";
+
+  app.innerHTML = `
+    <div class="page">
+      <div class="wrap">
+
+        <button class="back" onclick="renderHome()">
+          ← Back
+        </button>
+
+        <div class="personHero">
+
+          <div
+            class="personPhoto"
+            ${
+              profilePhoto
+              ? `style="background-image:url('${profilePhoto}')"`
+              : ""
+            }
+          >
+            ${
+              profilePhoto
+              ? ""
+              : escapeHtml(person.name?.charAt(0) || "?")
+            }
+          </div>
+
+          <div class="personIntro">
+
+            <div class="eyebrow">
+              REELWISE STAR
+            </div>
+
+            <h1>
+              ${escapeHtml(person.name)}
+            </h1>
+
+            <div class="personMeta">
+
+              ${
+                person.known_for_department
+                ? `<span>${escapeHtml(person.known_for_department)}</span>`
+                : ""
+              }
+
+              ${
+                person.place_of_birth
+                ? `<span>${escapeHtml(person.place_of_birth)}</span>`
+                : ""
+              }
+
+            </div>
+
+            <div class="facts">
+
+              <div class="fact">
+                <b>${birthday}</b>
+                <small>Born</small>
+              </div>
+
+              <div class="fact">
+                <b>${uniqueActing.length}</b>
+                <small>Acting Credits</small>
+              </div>
+
+              <div class="fact">
+                <b>${uniqueSelf.length}</b>
+                <small>As Himself</small>
+              </div>
+
+            </div>
+
+            ${
+              deathday
+              ? `
+                <div class="personMeta">
+                  <span>Died ${deathday}</span>
+                </div>
+              `
+              : ""
+            }
+
+            <p>
+              ${
+                escapeHtml(
+                  person.biography ||
+                  "Biography information coming to Reelwise."
+                )
+              }
+            </p>
+
+          </div>
+
+        </div>
+
+        <section class="creditSection">
+
+          <h2>Acting Credits</h2>
+
+          ${
+            uniqueActing.length
+            ? `
+              <div class="grid">
+                ${uniqueActing.slice(0,40).map(creditCard).join("")}
+              </div>
+            `
+            : `
+              <div class="empty">
+                <p class="muted">
+                  No acting credits found.
+                </p>
+              </div>
+            `
+          }
+
+        </section>
+
+        ${
+          uniqueSelf.length
+          ? `
+            <section class="creditSection">
+
+              <h2>As Himself</h2>
+
+              <p class="muted">
+                Interviews, documentaries, appearances and other
+                credits where the star appeared as themselves.
+              </p>
+
+              <div class="grid">
+                ${uniqueSelf.slice(0,30).map(selfCreditCard).join("")}
+              </div>
+
+            </section>
+          `
+          : ""
+        }
+
+      </div>
+    </div>
+  `;
+}
+
+function uniqueCredits(list){
+
+  const seen = new Set();
+
+  return list.filter(item => {
+
+    const id =
+      item.id ||
+      `${item.title}-${item.release_date}`;
+
+    if(seen.has(id)){
+      return false;
+    }
+
+    seen.add(id);
+    return true;
+
+  });
+}
+
+function creditCard(credit){
+
+  const title =
+    credit.title ||
+    credit.name ||
+    "Untitled";
+
+  const year =
+    (
+      credit.release_date ||
+      credit.first_air_date ||
+      ""
+    ).slice(0,4);
+
+  const character =
+    credit.character ||
+    "";
+
+  return `
+    <div
+      class="creditCard"
+      onclick="openMovie(${credit.id})"
+    >
+
+      <div class="poster">
+        ${moviePoster(credit.poster_path,title)}
+      </div>
+
+      <div class="info">
+
+        <b>${escapeHtml(title)}</b>
+
+        <small>
+          ${escapeHtml(year)}
+        </small>
+
+        ${
+          character
+          ? `
+            <div class="creditCharacter">
+              ${escapeHtml(character)}
+            </div>
+          `
+          : ""
+        }
+
+      </div>
+
+    </div>
+  `;
+}
+
+function selfCreditCard(credit){
+
+  const title =
+    credit.title ||
+    credit.name ||
+    "Untitled";
+
+  const year =
+    (
+      credit.release_date ||
+      credit.first_air_date ||
+      ""
+    ).slice(0,4);
+
+  return `
+    <div
+      class="creditCard"
+      onclick="openMovie(${credit.id})"
+    >
+
+      <div class="poster">
+        ${moviePoster(credit.poster_path,title)}
+      </div>
+
+      <div class="info">
+
+        <b>${escapeHtml(title)}</b>
+
+        <small>${escapeHtml(year)}</small>
+
+        <div class="selfNote">
+          As Himself
+        </div>
+
+      </div>
+
+    </div>
+  `;
+}
+
+function formatDate(date){
+
+  if(!date) return "—";
+
+  const parts = date.split("-");
+
+  if(parts.length !== 3){
+    return date;
+  }
+
+  return `${parts[1]}/${parts[2]}/${parts[0]}`;
+}
+
+function showPage(page){
+
+  if(page === "home"){
+    renderHome();
+    return;
+  }
+
+  if(page === "discover"){
+    renderDiscover();
+    return;
+  }
+
+  if(page === "stars"){
+    renderStars();
+    return;
+  }
+
+  if(page === "stories"){
+    renderStories();
+    return;
+  }
+
+  if(page === "sixdegrees"){
+    renderSixDegrees();
+    return;
+  }
+}
+
+function renderDiscover(){
+
+  app.innerHTML = `
+    <div class="page">
+      <div class="wrap">
+
+        <button class="back" onclick="renderHome()">
+          ← Back
+        </button>
+
+        <h1>Discover</h1>
+
+        <div class="feature">
+          <h3>Find your next favorite movie.</h3>
+          <p>
+            Search Reelwise for movies and stars, then explore
+            their casts, quotes, stories and connections.
+          </p>
+        </div>
+
+      </div>
+    </div>
+  `;
+}
+
+function renderStars(){
+
+  app.innerHTML = `
+    <div class="page">
+      <div class="wrap">
+
+        <button class="back" onclick="renderHome()">
+          ← Back
+        </button>
+
+        <h1>Stars</h1>
+
+        <div class="feature">
+          <h3>Hollywood's biggest stars.</h3>
+          <p>
+            Search for any actor or actress to explore their
+            biography, acting credits and appearances as themselves.
+          </p>
+        </div>
+
+      </div>
+    </div>
+  `;
+}
+
+function renderStories(){
+
+  app.innerHTML = `
+    <div class="page">
+      <div class="wrap">
+
+        <button class="back" onclick="renderHome()">
+          ← Back
+        </button>
+
+        <h1>Stories</h1>
+
+        <div class="feature">
+          <h3>The stories behind the movies.</h3>
+          <p>
+            Reelwise will bring together behind-the-scenes stories,
+            Hollywood facts, memorable moments and more.
+          </p>
+        </div>
+
+      </div>
+    </div>
+  `;
+}
+
+function renderSixDegrees(){
+
+  app.innerHTML = `
+    <div class="page">
+
+      <div class="wrap">
+
+        <button class="back" onclick="renderHome()">
+          ← Back
+        </button>
+
+        <div class="degreeBox">
+
+          <div class="eyebrow">
+            THE REELWISE GAME
+          </div>
+
+          <h1>Six Degrees</h1>
+
+          <p class="muted">
+            Can you connect any two movie stars in six movies or less?
+          </p>
+
+          <form
+            class="degreeForm"
+            id="degreeForm"
+          >
+
+            <input
+              id="degreeFrom"
+              placeholder="First actor — Tom Cruise"
+              required
+            >
+
+            <input
+              id="degreeTo"
+              placeholder="Second actor — Sylvester Stallone"
+              required
+            >
+
+            <button type="submit">
+              Connect
+            </button>
+
+          </form>
+
+          <div id="degreeOutput"></div>
+
+        </div>
+
+      </div>
+
+    </div>
+  `;
+
+  document
+    .getElementById("degreeForm")
+    .addEventListener("submit",findConnection);
+}
+
+async function findConnection(event){
+
+  event.preventDefault();
+
+  const from =
+    document.getElementById("degreeFrom").value.trim();
+
+  const to =
+    document.getElementById("degreeTo").value.trim();
+
+  const output =
+    document.getElementById("degreeOutput");
+
+  if(!from || !to) return;
+
+  output.innerHTML =
+    `<div class="loading">Finding the connection…</div>`;
+
+  try{
+
+    const response = await fetch(
+      `/api/search?type=degrees&from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`
+    );
+
+    const data = await response.json();
+
+    if(!response.ok){
+      throw new Error(
+        data.error || "Could not find the connection."
+      );
+    }
+
+    renderConnection(data);
+
+  }catch(error){
+
+    output.innerHTML = `
+      <div class="error">
+        ${escapeHtml(error.message)}
+      </div>
+    `;
+  }
+}
+
+function renderConnection(data){
+
+  const output =
+    document.getElementById("degreeOutput");
+
+  if(!data || !data.path || !data.path.length){
+
+    output.innerHTML = `
+      <div class="empty">
+        <h2>We couldn't find that connection.</h2>
+        <p class="muted">
+          Try two different actors.
+        </p>
+      </div>
+    `;
+
+    return;
+  }
+
+  let html = `
+    <div class="degreeResult">
+
+      <div class="degreeTitle">
+        ${escapeHtml(data.from.name)}
+        → 
+        ${escapeHtml(data.to.name)}
+      </div>
+  `;
+
+  for(let i=0;i<data.path.length;i++){
+
+    const step =
+      data.path[i];
+
+    html += `
+      <div class="connection">
+
+        <div class="connectionActor">
+          ${escapeHtml(step.person.name)}
+        </div>
+
+        ${
+          step.movie
+          ? `
+            <div class="connectionMovie">
+              🎬 ${escapeHtml(step.movie.title)}
+              ${
+                step.movie.year
+                ? ` (${escapeHtml(step.movie.year)})`
+                : ""
+              }
+            </div>
+          `
+          : ""
+        }
+
+      </div>
+    `;
+
+    if(i < data.path.length - 1){
+      html += `
+        <div class="connectionArrow">
+          ↓
+        </div>
+      `;
+    }
+  }
+
+  html += `
+    </div>
+  `;
+
+  output.innerHTML = html;
+}
+
+document
+  .getElementById("searchForm")
+  .addEventListener("submit",event => {
+
+    event.preventDefault();
+
+    performSearch(
+      document.getElementById("searchInput").value
+    );
+
+  });
+
+document
+  .getElementById("logo")
+  .addEventListener("click",renderHome);
+
+document
+  .querySelectorAll("nav button")
+  .forEach(button => {
+
+    button.addEventListener("click",() => {
+      showPage(button.dataset.page);
+    });
+
+  });
+
+renderHome();
+
+</script>
+
+</body>
+</html>
