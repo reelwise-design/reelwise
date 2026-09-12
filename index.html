@@ -1,544 +1,189 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Reelwise — Know the Movie. Know the Story.</title>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Reelwise — Movies. Stars. Stories.</title>
 
 <style>
-:root{
-  --bg:#090b0f;
-  --panel:#11151c;
-  --line:#252c38;
-  --text:#f5f7fa;
-  --muted:#9ca6b5;
-  --accent:#ff5a36;
-  --gold:#e4b34d
-}
-
 *{box-sizing:border-box}
 
 body{
   margin:0;
-  background:var(--bg);
-  color:var(--text);
-  font:15px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif
-}
-
-button,input{font:inherit}
-button{cursor:pointer}
-
-.wrap{
-  max-width:1120px;
-  margin:auto;
-  padding:0 20px
+  background:#08080c;
+  color:#fff;
+  font-family:Arial,Helvetica,sans-serif;
 }
 
 header{
-  position:sticky;
-  top:0;
-  z-index:5;
-  background:rgba(9,11,15,.97);
-  backdrop-filter:blur(12px);
-  border-bottom:1px solid var(--line)
+  background:linear-gradient(180deg,#191923 0%,#08080c 100%);
+  padding:22px 20px 70px;
 }
 
-.nav{
-  min-height:68px;
+nav{
+  max-width:1200px;
+  margin:auto;
   display:flex;
+  justify-content:space-between;
   align-items:center;
   gap:20px;
-  flex-wrap:wrap;
-  padding:10px 20px
 }
 
 .logo{
-  font-size:25px;
-  font-weight:900;
-  letter-spacing:-1px;
-  cursor:pointer
+  font-size:30px;
+  font-weight:800;
+  letter-spacing:1px;
 }
 
-.logo span{color:var(--accent)}
+.logo span{color:#e50914}
 
-nav{
+.nav-links{
   display:flex;
-  gap:5px;
-  color:#cbd1da
+  gap:22px;
+  flex-wrap:wrap;
+  justify-content:center;
 }
 
-nav button{
-  background:none;
-  border:0;
-  color:inherit;
-  padding:8px 10px
+.nav-links a{
+  color:#aaa;
+  text-decoration:none;
+  font-size:14px;
 }
 
-nav button:hover{color:white}
-
-.searchbox{
-  margin-left:auto;
-  display:flex;
-  gap:8px
-}
-
-.searchbox input{
-  width:250px;
-  background:#151a22;
-  border:1px solid #303846;
-  color:white;
-  border-radius:9px;
-  padding:10px 12px;
-  outline:none
-}
-
-.searchbox input:focus{border-color:var(--accent)}
-
-.searchbox button,
-.cta{
-  background:var(--accent);
-  border:0;
-  color:white;
-  border-radius:9px;
-  padding:10px 15px;
-  font-weight:800
-}
-
-.page{padding:45px 0 70px}
+.nav-links a:hover{color:#fff}
 
 .hero{
-  padding:55px 0 40px;
-  display:grid;
-  grid-template-columns:1.4fr .8fr;
-  gap:35px;
-  align-items:center
-}
-
-.eyebrow{
-  color:var(--gold);
-  font-weight:900;
-  letter-spacing:1.5px;
-  font-size:12px
+  max-width:900px;
+  margin:75px auto 0;
+  text-align:center;
 }
 
 .hero h1{
-  font-size:clamp(44px,7vw,76px);
-  line-height:.98;
-  letter-spacing:-3px;
-  margin:12px 0 18px
+  font-size:clamp(42px,8vw,76px);
+  margin:0;
+  line-height:1;
 }
+
+.hero h1 span{color:#e50914}
 
 .hero p{
+  color:#aaa;
   font-size:19px;
-  color:var(--muted);
-  max-width:650px
+  line-height:1.5;
+  margin:22px 0 32px;
 }
 
-.heroCard{
-  background:linear-gradient(145deg,#1d2634,#0f1319);
-  border:1px solid var(--line);
-  border-radius:18px;
-  padding:28px;
-  min-height:280px;
+.search{
+  max-width:700px;
+  margin:auto;
   display:flex;
-  flex-direction:column;
-  justify-content:end
+  gap:10px;
 }
 
-.heroCard b{font-size:28px}
-
-.section{padding:28px 0}
-
-.sectionhead{
-  display:flex;
-  justify-content:space-between;
-  align-items:end;
-  margin-bottom:18px
+.search input{
+  flex:1;
+  padding:18px;
+  border-radius:8px;
+  border:1px solid #333;
+  background:#18181f;
+  color:#fff;
+  font-size:17px;
+  outline:none;
 }
 
-.section h2{
-  margin:0;
-  font-size:28px
-}
-
-.muted{color:var(--muted)}
-
-.grid{
-  display:grid;
-  grid-template-columns:repeat(5,1fr);
-  gap:14px
-}
-
-.card{
-  background:var(--panel);
-  border:1px solid var(--line);
-  border-radius:12px;
-  overflow:hidden;
-  cursor:pointer;
-  transition:.18s
-}
-
-.card:hover{
-  transform:translateY(-3px);
-  border-color:#4a5568
-}
-
-.poster{
-  aspect-ratio:2/3;
-  background:linear-gradient(145deg,#36465b,#141820);
-  display:flex;
-  align-items:end;
-  padding:15px;
-  font-size:20px;
-  font-weight:900;
-  position:relative
-}
-
-.poster img{
-  width:100%;
-  height:100%;
-  object-fit:cover;
-  display:block;
-  position:absolute;
-  inset:0
-}
-
-.poster span{
-  position:relative;
-  z-index:1;
-  text-shadow:0 2px 8px #000
-}
-
-.info{padding:13px}
-.info b{display:block}
-.info small{color:var(--muted)}
-
-.feature{
-  background:var(--panel);
-  border:1px solid var(--line);
-  border-radius:15px;
-  padding:24px;
-  margin:12px 0
-}
-
-.feature h3{
-  font-size:24px;
-  margin:6px 0
-}
-
-.feature p{
-  color:var(--muted);
-  max-width:780px
-}
-
-.detail{
-  display:grid;
-  grid-template-columns:280px 1fr;
-  gap:30px
-}
-
-.detailposter{
-  aspect-ratio:2/3;
-  border-radius:15px;
-  background:#151a22;
-  overflow:hidden
-}
-
-.detailposter img{
-  width:100%;
-  height:100%;
-  object-fit:cover
-}
-
-.personHero{
-  display:grid;
-  grid-template-columns:280px 1fr;
-  gap:30px;
-  align-items:start
-}
-
-.personPhoto{
-  aspect-ratio:2/3;
-  border-radius:15px;
-  background:linear-gradient(145deg,#39495f,#10141a);
-  background-size:cover;
-  background-position:center;
-  display:flex;
-  align-items:center;
-  justify-content:center;
-  font-size:48px;
-  font-weight:900
-}
-
-.personIntro h1{
-  font-size:clamp(40px,6vw,62px);
-  line-height:1;
-  margin:0 0 12px
-}
-
-.personIntro p{
-  color:var(--muted);
+.search button{
+  padding:18px 26px;
+  border:0;
+  border-radius:8px;
+  background:#e50914;
+  color:#fff;
+  font-weight:bold;
   font-size:16px;
-  max-width:760px
 }
 
-.personMeta{
-  display:flex;
-  flex-wrap:wrap;
-  gap:8px;
-  margin:10px 0 18px
+main{
+  max-width:1200px;
+  margin:auto;
+  padding:45px 20px;
 }
 
-.personMeta span{
-  background:#151b24;
-  border:1px solid #303846;
-  border-radius:999px;
-  padding:7px 10px;
-  color:#cbd1da
+.section-title{
+  font-size:25px;
+  margin-bottom:20px;
 }
 
-.facts{
+.features{
   display:grid;
   grid-template-columns:repeat(3,1fr);
-  gap:10px;
-  margin:20px 0
+  gap:18px;
+  margin-bottom:55px;
 }
 
-.fact{
-  background:var(--panel);
-  border:1px solid var(--line);
-  border-radius:10px;
-  padding:13px
-}
-
-.fact b{
-  display:block;
-  font-size:18px
-}
-
-.fact small{color:var(--muted)}
-
-.cast{
-  display:flex;
-  flex-wrap:wrap;
-  gap:8px
-}
-
-.cast button{
-  background:#151b24;
-  color:white;
-  border:1px solid #303846;
-  border-radius:8px;
-  padding:9px
-}
-
-.resultList{
-  display:grid;
-  gap:10px;
-  margin-top:20px
-}
-
-.result{
-  background:var(--panel);
-  border:1px solid var(--line);
-  border-radius:10px;
-  padding:14px;
-  display:flex;
-  justify-content:space-between;
-  align-items:center;
-  cursor:pointer
-}
-
-.result:hover{border-color:var(--accent)}
-
-.resultTitle{
-  font-weight:800;
-  font-size:17px
-}
-
-.resultType{
-  color:var(--gold);
-  font-size:12px;
-  font-weight:800;
-  text-transform:uppercase
-}
-
-.empty{
-  padding:40px;
-  text-align:center;
-  background:var(--panel);
-  border:1px dashed #37404e;
-  border-radius:14px
-}
-
-.back{
-  background:none;
-  border:0;
-  color:var(--muted);
-  padding:0 0 20px
-}
-
-.quote{
-  font-size:22px;
-  font-weight:800;
-  padding:14px 0;
-  border-bottom:1px solid var(--line)
-}
-
-.quote:last-child{border-bottom:0}
-
-.degreeBox{
-  max-width:800px;
-  margin:25px auto
-}
-
-.degreeForm{
-  display:grid;
-  grid-template-columns:1fr 1fr auto;
-  gap:10px;
-  margin-bottom:25px
-}
-
-.degreeForm input{
-  background:#151a22;
-  border:1px solid #303846;
-  color:white;
-  border-radius:9px;
-  padding:13px
-}
-
-.degreeForm button{
-  background:var(--accent);
-  border:0;
-  color:white;
-  border-radius:9px;
-  padding:13px 18px;
-  font-weight:800
-}
-
-.degreeResult{
-  background:var(--panel);
-  border:1px solid var(--line);
-  border-radius:15px;
-  padding:25px
-}
-
-.degreeTitle{
-  font-size:26px;
-  font-weight:900;
-  margin-bottom:20px
-}
-
-.connection{
-  background:#151a22;
-  border:1px solid #303846;
+.feature{
+  background:#15151c;
+  border:1px solid #272731;
   border-radius:12px;
-  padding:18px;
-  margin:12px 0
+  padding:25px;
 }
 
-.connectionActor{
-  font-size:21px;
-  font-weight:900
+.feature-icon{
+  font-size:32px;
+  margin-bottom:12px;
 }
 
-.connectionMovie{
-  color:var(--gold);
-  font-weight:800;
-  margin-top:5px
+.feature h3{margin:0 0 8px}
+
+.feature p{
+  margin:0;
+  color:#999;
+  line-height:1.5;
 }
 
-.connectionArrow{
-  color:var(--muted);
+#results{
+  display:grid;
+  grid-template-columns:repeat(auto-fill,minmax(170px,1fr));
+  gap:22px;
+}
+
+.message{
+  color:#888;
   text-align:center;
-  padding:4px
+  grid-column:1/-1;
+  padding:30px;
 }
 
-.error{
-  color:#ff8d76;
-  background:#211411;
-  border:1px solid #613127;
-  border-radius:10px;
-  padding:15px
+footer{
+  border-top:1px solid #222;
+  text-align:center;
+  color:#666;
+  padding:30px 20px;
+  margin-top:40px;
 }
 
-.loading{
-  color:var(--muted);
-  padding:20px 0
-}
-
-.creditSection{
-  margin-top:30px
-}
-
-.creditSection h2{
-  font-size:28px;
-  margin-bottom:18px
-}
-
-.creditCard{
-  background:var(--panel);
-  border:1px solid var(--line);
-  border-radius:12px;
-  overflow:hidden;
-  cursor:pointer
-}
-
-.creditCard .poster{
-  aspect-ratio:2/3
-}
-
-.creditCharacter{
-  color:var(--muted);
-  margin-top:5px;
-  font-size:13px
-}
-
-.selfNote{
-  color:var(--gold);
-  font-size:13px;
-  margin-top:4px
-}
-
-.footer{
-  border-top:1px solid var(--line);
-  color:#737d8b;
-  padding:28px 0;
-  font-size:12px
-}
-
-@media(max-width:850px){
-
-  .hero,
-  .detail,
-  .personHero{
-    grid-template-columns:1fr
-  }
-
-  .grid{
-    grid-template-columns:repeat(2,1fr)
-  }
-
-  .searchbox{
-    order:2;
-    width:100%;
-    margin-left:0
-  }
-
-  .searchbox input{width:100%}
-
+@media(max-width:700px){
   nav{
-    order:3;
+    flex-direction:column;
+    gap:18px;
+  }
+
+  .nav-links{
+    gap:12px;
+  }
+
+  .nav-links a{
+    font-size:13px;
+  }
+
+  .features{
+    grid-template-columns:1fr;
+  }
+
+  .search{
+    flex-direction:column;
+  }
+
+  .search button{
     width:100%;
-    overflow-x:auto
-  }
-
-  .facts{
-    grid-template-columns:1fr 1fr
-  }
-
-  .degreeForm{
-    grid-template-columns:1fr
   }
 }
 </style>
@@ -547,1296 +192,112 @@ nav button:hover{color:white}
 <body>
 
 <header>
-<div class="wrap nav">
-
-<div class="logo" id="logo">
-reel<span>wise</span>
-</div>
 
 <nav>
-<button data-page="home">Movies</button>
-<button data-page="discover">Discover</button>
-<button data-page="stars">Stars</button>
-<button data-page="stories">Stories</button>
-<button data-page="sixdegrees">Six Degrees</button>
+  <div class="logo">REEL<span>WISE</span></div>
+
+  <div class="nav-links">
+    <a href="#">Movies</a>
+    <a href="#">Stars</a>
+    <a href="#">Quotes</a>
+    <a href="#">Six Degrees</a>
+  </div>
 </nav>
 
-<form class="searchbox" id="searchForm">
-<input
-id="searchInput"
-autocomplete="off"
-placeholder="Search movies or stars…">
-<button type="submit">Search</button>
-</form>
+<div class="hero">
+
+  <h1>Movies <span>reimagined.</span></h1>
+
+  <p>
+    Discover movies, legendary stars, unforgettable quotes
+    and the stories behind the scenes.
+  </p>
+
+  <div class="search">
+    <input
+      id="searchInput"
+      type="text"
+      placeholder="Search any movie..."
+    >
+
+    <button onclick="searchMovies()">Search</button>
+  </div>
 
 </div>
+
 </header>
 
-<main id="app"></main>
+<main>
 
-<footer class="footer">
-<div class="wrap">
-Reelwise · Know the movie. Know the story.
+<h2 class="section-title">Explore Reelwise</h2>
+
+<div class="features">
+
+  <div class="feature">
+    <div class="feature-icon">🎬</div>
+    <h3>Movies</h3>
+    <p>
+      Explore movies from every era, from classics
+      to today's biggest films.
+    </p>
+  </div>
+
+  <div class="feature">
+    <div class="feature-icon">⭐</div>
+    <h3>Movie Stars</h3>
+    <p>
+      Discover the actors behind the characters
+      and the stories behind their careers.
+    </p>
+  </div>
+
+  <div class="feature">
+    <div class="feature-icon">💬</div>
+    <h3>Famous Quotes</h3>
+    <p>
+      Relive the lines that made movie history.
+    </p>
+  </div>
+
 </div>
+
+<h2 class="section-title">Movie Search</h2>
+
+<div id="results">
+  <div class="message">
+    Search for a movie above to get started.
+  </div>
+</div>
+
+</main>
+
+<footer>
+  Reelwise — Movies. Stars. Stories.
 </footer>
 
 <script>
+function searchMovies(){
 
-const app = document.getElementById("app");
+  const query=document
+    .getElementById("searchInput")
+    .value
+    .trim();
 
-const featuredMovies = [
-  {
-    title:"Rocky III",
-    year:1982,
-    icon:"🥊",
-    genre:"Drama · Sports",
-    story:"Rocky Balboa faces Clubber Lang and fights to regain the heavyweight championship."
-  },
-  {
-    title:"Top Gun",
-    year:1986,
-    icon:"✈️",
-    genre:"Action · Drama",
-    story:"Tom Cruise became one of Hollywood's biggest stars as Maverick."
-  },
-  {
-    title:"A Few Good Men",
-    year:1992,
-    icon:"⚖️",
-    genre:"Drama · Legal",
-    story:"One of the most quoted courtroom movies ever made."
-  },
-  {
-    title:"The Sandlot",
-    year:1993,
-    icon:"⚾",
-    genre:"Comedy · Family",
-    story:"A baseball movie that became a cult classic."
-  },
-  {
-    title:"Goodfellas",
-    year:1990,
-    icon:"🍝",
-    genre:"Crime · Drama",
-    story:"Martin Scorsese's iconic look at life inside organized crime."
-  },
-  {
-    title:"The Hangover",
-    year:2009,
-    icon:"🍻",
-    genre:"Comedy",
-    story:"A bachelor party goes spectacularly wrong in Las Vegas."
-  },
-  {
-    title:"Old School",
-    year:2003,
-    icon:"🎓",
-    genre:"Comedy",
-    story:"Three friends attempt to relive their college years."
-  },
-  {
-    title:"Forrest Gump",
-    year:1994,
-    icon:"🪶",
-    genre:"Drama · Comedy",
-    story:"Tom Hanks stars in one of the most recognizable movies of the 1990s."
-  },
-  {
-    title:"The Sixth Sense",
-    year:1999,
-    icon:"👻",
-    genre:"Mystery · Drama",
-    story:"Bruce Willis and Haley Joel Osment star in a modern classic."
-  },
-  {
-    title:"The Godfather",
-    year:1972,
-    icon:"🍊",
-    genre:"Crime · Drama",
-    story:"The Corleone family saga became one of the greatest films in history."
-  }
-];
+  const results=document
+    .getElementById("results");
 
-const quotes = {
-  "Rocky":[
-    "Yo, Adrian!",
-    "I did it!"
-  ],
-  "Rocky III":[
-    "There is no tomorrow!",
-    "The eye of the tiger."
-  ],
-  "Top Gun":[
-    "I feel the need—the need for speed.",
-    "Talk to me, Goose."
-  ],
-  "A Few Good Men":[
-    "You can't handle the truth!"
-  ],
-  "The Sandlot":[
-    "You're killing me, Smalls!"
-  ],
-  "Goodfellas":[
-    "As far back as I can remember, I always wanted to be a gangster."
-  ]
-};
-
-function escapeHtml(value){
-  return String(value ?? "")
-    .replaceAll("&","&amp;")
-    .replaceAll("<","&lt;")
-    .replaceAll(">","&gt;")
-    .replaceAll('"',"&quot;")
-    .replaceAll("'","&#039;");
-}
-
-function showLoading(){
-  app.innerHTML = `
-    <div class="page">
-      <div class="wrap">
-        <div class="loading">Loading…</div>
-      </div>
-    </div>
-  `;
-}
-
-function showError(message){
-  app.innerHTML = `
-    <div class="page">
-      <div class="wrap">
-        <div class="error">${escapeHtml(message)}</div>
-      </div>
-    </div>
-  `;
-}
-
-function moviePoster(path,title){
-  if(path){
-    return `
-      <img
-        src="https://image.tmdb.org/t/p/w500${escapeHtml(path)}"
-        alt="${escapeHtml(title)}">
-    `;
-  }
-
-  return `<span>${escapeHtml(title)}</span>`;
-}
-
-function renderHome(){
-  app.innerHTML = `
-    <div class="page">
-
-      <div class="wrap">
-
-        <section class="hero">
-
-          <div>
-            <div class="eyebrow">WELCOME TO REELWISE</div>
-            <h1>Know the movie.<br>Know the story.</h1>
-            <p>
-              Explore movies, stars, memorable quotes, stories and
-              the connections between Hollywood's biggest names.
-            </p>
-            <button class="cta" onclick="showPage('sixdegrees')">
-              Play Six Degrees
-            </button>
-          </div>
-
-          <div class="heroCard">
-            <div class="eyebrow">WHAT MAKES REELWISE DIFFERENT?</div>
-            <b>Movies are more than a database.</b>
-            <p class="muted">
-              Discover the people, quotes, stories and connections
-              behind the movies you love.
-            </p>
-          </div>
-
-        </section>
-
-        <section class="section">
-
-          <div class="sectionhead">
-            <h2>Featured Movies</h2>
-          </div>
-
-          <div class="grid">
-            ${featuredMovies.map(movie => `
-              <div class="card"
-                   onclick="searchAndOpenMovie('${escapeHtml(movie.title)}')">
-
-                <div class="poster">
-                  <span>${movie.icon} ${escapeHtml(movie.title)}</span>
-                </div>
-
-                <div class="info">
-                  <b>${escapeHtml(movie.title)}</b>
-                  <small>${movie.year} · ${escapeHtml(movie.genre)}</small>
-                </div>
-
-              </div>
-            `).join("")}
-          </div>
-
-        </section>
-
-      </div>
-    </div>
-  `;
-}
-
-async function searchAndOpenMovie(title){
-  showLoading();
-
-  try{
-    const response = await fetch(
-      `/api/search?q=${encodeURIComponent(title)}`
-    );
-
-    const data = await response.json();
-
-    const movie =
-      (data.movies || []).find(
-        m => String(m.title).toLowerCase() === title.toLowerCase()
-      ) ||
-      (data.results || []).find(
-        m =>
-          m.media_type === "movie" &&
-          String(m.title).toLowerCase() === title.toLowerCase()
-      );
-
-    if(!movie){
-      throw new Error("Movie not found.");
-    }
-
-    openMovie(movie.id);
-
-  }catch(error){
-    showError(error.message);
-  }
-}
-
-async function performSearch(query){
-
-  if(!query.trim()) return;
-
-  showLoading();
-
-  try{
-
-    const response = await fetch(
-      `/api/search?q=${encodeURIComponent(query)}`
-    );
-
-    const data = await response.json();
-
-    if(!response.ok){
-      throw new Error(data.error || "Search failed.");
-    }
-
-    renderSearchResults(data);
-
-  }catch(error){
-    showError(error.message);
-  }
-}
-
-function renderConnection(data){
-
-  const output =
-    document.getElementById("degreeOutput");
-
-  if(!data || !data.path || !data.path.length){
-
-    output.innerHTML = `
-      <div class="empty">
-        <h2>We couldn't find that connection.</h2>
-        <p class="muted">
-          Try two different actors.
-        </p>
-      </div>
-    `;
-
+  if(!query){
+    results.innerHTML=
+      '<div class="message">Enter a movie title to search.</div>';
     return;
   }
 
-  const degrees =
-    Math.max(0, data.path.length - 1);
+  results.innerHTML=
+    '<div class="message">Searching for "'+
+    query+
+    '"...</div>';
 
-  let html = `
-    <div class="degreeResult">
-
-      <div class="eyebrow">
-        CONNECTION FOUND
-      </div>
-
-      <div class="degreeTitle">
-        ${escapeHtml(data.from.name)}
-        →
-        ${escapeHtml(data.to.name)}
-      </div>
-
-      <div class="facts">
-
-        <div class="fact">
-          <b>${degrees}</b>
-          <small>${degrees === 1 ? "Degree" : "Degrees"}</small>
-        </div>
-
-        <div class="fact">
-          <b>${data.path.length}</b>
-          <small>Stars</small>
-        </div>
-
-        <div class="fact">
-          <b>6</b>
-          <small>Maximum</small>
-        </div>
-
-      </div>
-
-      <div class="feature">
-
-        <h3>
-          🎬 ${degrees <= 6 ? "You connected them!" : "Connection found!"}
-        </h3>
-
-        <p class="muted">
-          Here's the Hollywood chain:
-        </p>
-
-      </div>
-  `;
-
-  for(let i=0;i<data.path.length;i++){
-
-    const step =
-      data.path[i];
-
-    html += `
-      <div class="connection">
-
-        <div
-          class="connectionActor"
-          onclick="openPerson(${step.person.id})"
-          style="cursor:pointer"
-        >
-          ⭐ ${escapeHtml(step.person.name)}
-        </div>
-
-        ${
-          step.movie
-          ? `
-            <div
-              class="connectionMovie"
-              onclick="openMovie(${step.movie.id})"
-              style="cursor:pointer"
-            >
-              🎬 ${escapeHtml(step.movie.title)}
-              ${
-                step.movie.year
-                ? ` (${escapeHtml(step.movie.year)})`
-                : ""
-              }
-            </div>
-          `
-          : ""
-        }
-
-      </div>
-    `;
-
-    if(i < data.path.length - 1){
-      html += `
-        <div class="connectionArrow">
-          ↓
-        </div>
-      `;
-    }
-  }
-
-  html += `
-
-      <div style="text-align:center;margin-top:25px">
-
-        <button
-          class="cta"
-          onclick="renderSixDegrees()"
-        >
-          Play Again
-        </button>
-
-      </div>
-
-    </div>
-  `;
-
-  output.innerHTML = html;
 }
-
-  const results = [...(data.results || [])].sort((a, b) => {
-  if (a.result_type === "person" && b.result_type !== "person") return -1;
-  if (a.result_type !== "person" && b.result_type === "person") return 1;
-  return 0;
-});
-
-  if(!results.length){
-    app.innerHTML = `
-      <div class="page">
-        <div class="wrap">
-          <div class="empty">
-            <h2>No results found</h2>
-            <p class="muted">
-              Try another movie or star.
-            </p>
-          </div>
-        </div>
-      </div>
-    `;
-    return;
-  }
-
-  app.innerHTML = `
-    <div class="page">
-      <div class="wrap">
-
-        <button class="back" onclick="renderHome()">
-          ← Back to Reelwise
-        </button>
-
-        <h1>Search Results</h1>
-
-        <div class="resultList">
-
-          ${results.map(item => {
-
-            const isPerson = item.result_type === "person";
-            const title = isPerson ? item.name : item.title;
-            const date = isPerson
-              ? "Star"
-              : (item.release_date || "").slice(0,4);
-
-            return `
-              <div class="result"
-                   onclick="${
-                     isPerson
-                     ? `openPerson(${item.id})`
-                     : `openMovie(${item.id})`
-                   }">
-
-                <div>
-                  <div class="resultTitle">
-                    ${escapeHtml(title)}
-                  </div>
-
-                  <div class="muted">
-                    ${escapeHtml(date)}
-                  </div>
-                </div>
-
-                <div class="resultType">
-                  ${isPerson ? "Star" : "Movie"}
-                </div>
-
-              </div>
-            `;
-
-          }).join("")}
-
-        </div>
-
-      </div>
-    </div>
-  `;
-}
-
-async function openMovie(id){
-
-  showLoading();
-
-  try{
-
-    const response = await fetch(
-      `/api/search?type=movie-details&id=${encodeURIComponent(id)}`
-    );
-
-    const movie = await response.json();
-
-    if(!response.ok){
-      throw new Error(movie.error || "Could not load movie.");
-    }
-
-    renderMovie(movie);
-
-  }catch(error){
-    showError(error.message);
-  }
-}
-
-function renderMovie(movie){
-
-  const cast =
-    movie.credits?.cast ||
-    [];
-
-  const movieQuotes =
-    quotes[movie.title] ||
-    [];
-
-  const year =
-    (movie.release_date || "").slice(0,4);
-
-  app.innerHTML = `
-    <div class="page">
-      <div class="wrap">
-
-        <button class="back" onclick="renderHome()">
-          ← Back
-        </button>
-
-        <div class="detail">
-
-          <div class="detailposter">
-            ${moviePoster(movie.poster_path,movie.title)}
-          </div>
-
-          <div>
-
-            <div class="eyebrow">
-              ${escapeHtml(year)}
-            </div>
-
-            <h1>${escapeHtml(movie.title)}</h1>
-
-            <p class="muted">
-              ${escapeHtml(movie.overview || "No overview available.")}
-            </p>
-
-            <div class="facts">
-
-              <div class="fact">
-                <b>${movie.runtime || "—"}</b>
-                <small>Minutes</small>
-              </div>
-
-              <div class="fact">
-                <b>${movie.vote_average ? movie.vote_average.toFixed(1) : "—"}</b>
-                <small>Rating</small>
-              </div>
-
-              <div class="fact">
-                <b>${cast.length}</b>
-                <small>Cast Members</small>
-              </div>
-
-            </div>
-
-          </div>
-
-        </div>
-
-        <section class="section">
-
-          <div class="sectionhead">
-            <h2>Entire Cast</h2>
-          </div>
-
-          <div class="cast">
-
-            ${cast.map(person => `
-              <button onclick="openPerson(${person.id})">
-                ${escapeHtml(person.name)}
-                ${
-                  person.character
-                  ? ` · ${escapeHtml(person.character)}`
-                  : ""
-                }
-              </button>
-            `).join("")}
-
-          </div>
-
-        </section>
-
-        <section class="section">
-
-          <div class="sectionhead">
-            <h2>Memorable Quotes</h2>
-          </div>
-
-          ${
-            movieQuotes.length
-            ? movieQuotes.map(q => `
-                <div class="quote">
-                  “${escapeHtml(q)}”
-                </div>
-              `).join("")
-            : `
-              <div class="empty">
-                <p class="muted">
-                  More memorable quotes coming to Reelwise.
-                </p>
-              </div>
-            `
-          }
-
-        </section>
-
-      </div>
-    </div>
-  `;
-}
-
-async function openPerson(id){
-
-  showLoading();
-
-  try{
-
-    const response = await fetch(
-      `/api/search?type=person-details&id=${encodeURIComponent(id)}`
-    );
-
-    const person = await response.json();
-
-    if(!response.ok){
-      throw new Error(person.error || "Could not load star.");
-    }
-
-    renderPerson(person);
-
-  }catch(error){
-    showError(error.message);
-  }
-}
-
-function renderPerson(person){
-
-  const credits =
-    person.combined_credits?.cast ||
-    person.movie_credits?.cast ||
-    [];
-
-  const actingCredits = [];
-  const selfCredits = [];
-
-  credits.forEach(credit => {
-
-    const character =
-      String(credit.character || "").trim();
-
-    const isSelf =
-      /^self\b/i.test(character) ||
-      /^himself\b/i.test(character) ||
-      /^herself\b/i.test(character) ||
-      /^themselves\b/i.test(character);
-
-    const isArchive =
-      /archive footage/i.test(character);
-
-    if(isArchive) return;
-
-    if(isSelf){
-      selfCredits.push(credit);
-    }else{
-      actingCredits.push(credit);
-    }
-
-  });
-
-  const uniqueActing = uniqueCredits(actingCredits);
-  const uniqueSelf = uniqueCredits(selfCredits);
-
-  const profilePhoto =
-    person.profile_path
-      ? `https://image.tmdb.org/t/p/w500${person.profile_path}`
-      : "";
-
-  const birthday =
-    person.birthday
-      ? formatDate(person.birthday)
-      : "—";
-
-  const deathday =
-    person.deathday
-      ? formatDate(person.deathday)
-      : "";
-
-  app.innerHTML = `
-    <div class="page">
-      <div class="wrap">
-
-        <button class="back" onclick="renderHome()">
-          ← Back
-        </button>
-
-        <div class="personHero">
-
-          <div
-            class="personPhoto"
-            ${
-              profilePhoto
-              ? `style="background-image:url('${profilePhoto}')"`
-              : ""
-            }
-          >
-            ${
-              profilePhoto
-              ? ""
-              : escapeHtml(person.name?.charAt(0) || "?")
-            }
-          </div>
-
-          <div class="personIntro">
-
-            <div class="eyebrow">
-              REELWISE STAR
-            </div>
-
-            <h1>
-              ${escapeHtml(person.name)}
-            </h1>
-
-            <div class="personMeta">
-
-              ${
-                person.known_for_department
-                ? `<span>${escapeHtml(person.known_for_department)}</span>`
-                : ""
-              }
-
-              ${
-                person.place_of_birth
-                ? `<span>${escapeHtml(person.place_of_birth)}</span>`
-                : ""
-              }
-
-            </div>
-
-            <div class="facts">
-
-              <div class="fact">
-                <b>${birthday}</b>
-                <small>Born</small>
-              </div>
-
-              <div class="fact">
-                <b>${uniqueActing.length}</b>
-                <small>Acting Credits</small>
-              </div>
-
-              <div class="fact">
-                <b>${uniqueSelf.length}</b>
-                <small>As Himself</small>
-              </div>
-
-            </div>
-
-            ${
-              deathday
-              ? `
-                <div class="personMeta">
-                  <span>Died ${deathday}</span>
-                </div>
-              `
-              : ""
-            }
-
-            <p>
-              ${
-                escapeHtml(
-                  person.biography ||
-                  "Biography information coming to Reelwise."
-                )
-              }
-            </p>
-
-          </div>
-
-        </div>
-
-        <section class="creditSection">
-
-          <h2>Acting Credits</h2>
-
-          ${
-            uniqueActing.length
-            ? `
-              <div class="grid">
-                ${uniqueActing.slice(0,40).map(creditCard).join("")}
-              </div>
-            `
-            : `
-              <div class="empty">
-                <p class="muted">
-                  No acting credits found.
-                </p>
-              </div>
-            `
-          }
-
-        </section>
-
-        ${
-          uniqueSelf.length
-          ? `
-            <section class="creditSection">
-
-              <h2>As Himself</h2>
-
-              <p class="muted">
-                Interviews, documentaries, appearances and other
-                credits where the star appeared as themselves.
-              </p>
-
-              <div class="grid">
-                ${uniqueSelf.slice(0,30).map(selfCreditCard).join("")}
-              </div>
-
-            </section>
-          `
-          : ""
-        }
-
-      </div>
-    </div>
-  `;
-}
-
-function uniqueCredits(list){
-
-  const seen = new Set();
-
-  return list.filter(item => {
-
-    const id =
-      item.id ||
-      `${item.title}-${item.release_date}`;
-
-    if(seen.has(id)){
-      return false;
-    }
-
-    seen.add(id);
-    return true;
-
-  });
-}
-
-function creditCard(credit){
-
-  const title =
-    credit.title ||
-    credit.name ||
-    "Untitled";
-
-  const year =
-    (
-      credit.release_date ||
-      credit.first_air_date ||
-      ""
-    ).slice(0,4);
-
-  const character =
-    credit.character ||
-    "";
-
-  return `
-    <div
-      class="creditCard"
-      onclick="openMovie(${credit.id})"
-    >
-
-      <div class="poster">
-        ${moviePoster(credit.poster_path,title)}
-      </div>
-
-      <div class="info">
-
-        <b>${escapeHtml(title)}</b>
-
-        <small>
-          ${escapeHtml(year)}
-        </small>
-
-        ${
-          character
-          ? `
-            <div class="creditCharacter">
-              ${escapeHtml(character)}
-            </div>
-          `
-          : ""
-        }
-
-      </div>
-
-    </div>
-  `;
-}
-
-function selfCreditCard(credit){
-
-  const title =
-    credit.title ||
-    credit.name ||
-    "Untitled";
-
-  const year =
-    (
-      credit.release_date ||
-      credit.first_air_date ||
-      ""
-    ).slice(0,4);
-
-  return `
-    <div
-      class="creditCard"
-      onclick="openMovie(${credit.id})"
-    >
-
-      <div class="poster">
-        ${moviePoster(credit.poster_path,title)}
-      </div>
-
-      <div class="info">
-
-        <b>${escapeHtml(title)}</b>
-
-        <small>${escapeHtml(year)}</small>
-
-        <div class="selfNote">
-          As Himself
-        </div>
-
-      </div>
-
-    </div>
-  `;
-}
-
-function formatDate(date){
-
-  if(!date) return "—";
-
-  const parts = date.split("-");
-
-  if(parts.length !== 3){
-    return date;
-  }
-
-  return `${parts[1]}/${parts[2]}/${parts[0]}`;
-}
-
-function showPage(page){
-
-  if(page === "home"){
-    renderHome();
-    return;
-  }
-
-  if(page === "discover"){
-    renderDiscover();
-    return;
-  }
-
-  if(page === "stars"){
-    renderStars();
-    return;
-  }
-
-  if(page === "stories"){
-    renderStories();
-    return;
-  }
-
-  if(page === "sixdegrees"){
-    renderSixDegrees();
-    return;
-  }
-}
-
-function renderDiscover(){
-
-  app.innerHTML = `
-    <div class="page">
-      <div class="wrap">
-
-        <button class="back" onclick="renderHome()">
-          ← Back
-        </button>
-
-        <h1>Discover</h1>
-
-        <div class="feature">
-          <h3>Find your next favorite movie.</h3>
-          <p>
-            Search Reelwise for movies and stars, then explore
-            their casts, quotes, stories and connections.
-          </p>
-        </div>
-
-      </div>
-    </div>
-  `;
-}
-
-function renderStars(){
-
-  app.innerHTML = `
-    <div class="page">
-      <div class="wrap">
-
-        <button class="back" onclick="renderHome()">
-          ← Back
-        </button>
-
-        <h1>Stars</h1>
-
-        <div class="feature">
-          <h3>Hollywood's biggest stars.</h3>
-          <p>
-            Search for any actor or actress to explore their
-            biography, acting credits and appearances as themselves.
-          </p>
-        </div>
-
-      </div>
-    </div>
-  `;
-}
-
-function renderStories(){
-
-  app.innerHTML = `
-    <div class="page">
-      <div class="wrap">
-
-        <button class="back" onclick="renderHome()">
-          ← Back
-        </button>
-
-        <h1>Stories</h1>
-
-        <div class="feature">
-          <h3>The stories behind the movies.</h3>
-          <p>
-            Reelwise will bring together behind-the-scenes stories,
-            Hollywood facts, memorable moments and more.
-          </p>
-        </div>
-
-      </div>
-    </div>
-  `;
-}
-
-function renderSixDegrees(){
-
-  app.innerHTML = `
-    <div class="page">
-
-      <div class="wrap">
-
-        <button class="back" onclick="renderHome()">
-          ← Back
-        </button>
-
-        <div class="degreeBox">
-
-          <div class="eyebrow">
-            THE REELWISE GAME
-          </div>
-
-          <h1>Six Degrees</h1>
-
-          <p class="muted">
-            Can you connect any two movie stars in six movies or less?
-          </p>
-
-          <form
-            class="degreeForm"
-            id="degreeForm"
-          >
-
-            <input
-              id="degreeFrom"
-              placeholder="First actor — Tom Cruise"
-              required
-            >
-
-            <input
-              id="degreeTo"
-              placeholder="Second actor — Sylvester Stallone"
-              required
-            >
-
-            <button type="submit">
-              Connect
-            </button>
-
-          </form>
-
-          <div id="degreeOutput"></div>
-
-        </div>
-
-      </div>
-
-    </div>
-  `;
-
-  document
-    .getElementById("degreeForm")
-    .addEventListener("submit",findConnection);
-}
-
-async function findConnection(event){
-
-  event.preventDefault();
-
-  const from =
-    document.getElementById("degreeFrom").value.trim();
-
-  const to =
-    document.getElementById("degreeTo").value.trim();
-
-  const output =
-    document.getElementById("degreeOutput");
-
-  if(!from || !to) return;
-
-  output.innerHTML =
-    `<div class="loading">Finding the connection…</div>`;
-
-  try{
-
-    const response = await fetch(
-      `/api/search?type=degrees&from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`
-    );
-
-    const data = await response.json();
-
-    if(!response.ok){
-      throw new Error(
-        data.error || "Could not find the connection."
-      );
-    }
-
-    renderConnection(data);
-
-  }catch(error){
-
-    output.innerHTML = `
-      <div class="error">
-        ${escapeHtml(error.message)}
-      </div>
-    `;
-  }
-}
-
-function renderConnection(data){
-
-  const output =
-    document.getElementById("degreeOutput");
-
-  if(!data || !data.path || !data.path.length){
-
-    output.innerHTML = `
-      <div class="empty">
-        <h2>We couldn't find that connection.</h2>
-        <p class="muted">
-          Try two different actors.
-        </p>
-      </div>
-    `;
-
-    return;
-  }
-
-  let html = `
-    <div class="degreeResult">
-
-      <div class="degreeTitle">
-        ${escapeHtml(data.from.name)}
-        → 
-        ${escapeHtml(data.to.name)}
-      </div>
-  `;
-
-  for(let i=0;i<data.path.length;i++){
-
-    const step =
-      data.path[i];
-
-    html += `
-      <div class="connection">
-
-        <div class="connectionActor">
-          ${escapeHtml(step.person.name)}
-        </div>
-
-        ${
-          step.movie
-          ? `
-            <div class="connectionMovie">
-              🎬 ${escapeHtml(step.movie.title)}
-              ${
-                step.movie.year
-                ? ` (${escapeHtml(step.movie.year)})`
-                : ""
-              }
-            </div>
-          `
-          : ""
-        }
-
-      </div>
-    `;
-
-    if(i < data.path.length - 1){
-      html += `
-        <div class="connectionArrow">
-          ↓
-        </div>
-      `;
-    }
-  }
-
-  html += `
-    </div>
-  `;
-
-  output.innerHTML = html;
-}
-
-document
-  .getElementById("searchForm")
-  .addEventListener("submit",event => {
-
-    event.preventDefault();
-
-    performSearch(
-      document.getElementById("searchInput").value
-    );
-
-  });
-
-document
-  .getElementById("logo")
-  .addEventListener("click",renderHome);
-
-document
-  .querySelectorAll("nav button")
-  .forEach(button => {
-
-    button.addEventListener("click",() => {
-      showPage(button.dataset.page);
-    });
-
-  });
-
-renderHome();
-
 </script>
 
 </body>
