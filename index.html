@@ -840,7 +840,138 @@ async function performSearch(query){
   }
 }
 
-function renderSearchResults(data){
+function renderConnection(data){
+
+  const output =
+    document.getElementById("degreeOutput");
+
+  if(!data || !data.path || !data.path.length){
+
+    output.innerHTML = `
+      <div class="empty">
+        <h2>We couldn't find that connection.</h2>
+        <p class="muted">
+          Try two different actors.
+        </p>
+      </div>
+    `;
+
+    return;
+  }
+
+  const degrees =
+    Math.max(0, data.path.length - 1);
+
+  let html = `
+    <div class="degreeResult">
+
+      <div class="eyebrow">
+        CONNECTION FOUND
+      </div>
+
+      <div class="degreeTitle">
+        ${escapeHtml(data.from.name)}
+        →
+        ${escapeHtml(data.to.name)}
+      </div>
+
+      <div class="facts">
+
+        <div class="fact">
+          <b>${degrees}</b>
+          <small>${degrees === 1 ? "Degree" : "Degrees"}</small>
+        </div>
+
+        <div class="fact">
+          <b>${data.path.length}</b>
+          <small>Stars</small>
+        </div>
+
+        <div class="fact">
+          <b>6</b>
+          <small>Maximum</small>
+        </div>
+
+      </div>
+
+      <div class="feature">
+
+        <h3>
+          🎬 ${degrees <= 6 ? "You connected them!" : "Connection found!"}
+        </h3>
+
+        <p class="muted">
+          Here's the Hollywood chain:
+        </p>
+
+      </div>
+  `;
+
+  for(let i=0;i<data.path.length;i++){
+
+    const step =
+      data.path[i];
+
+    html += `
+      <div class="connection">
+
+        <div
+          class="connectionActor"
+          onclick="openPerson(${step.person.id})"
+          style="cursor:pointer"
+        >
+          ⭐ ${escapeHtml(step.person.name)}
+        </div>
+
+        ${
+          step.movie
+          ? `
+            <div
+              class="connectionMovie"
+              onclick="openMovie(${step.movie.id})"
+              style="cursor:pointer"
+            >
+              🎬 ${escapeHtml(step.movie.title)}
+              ${
+                step.movie.year
+                ? ` (${escapeHtml(step.movie.year)})`
+                : ""
+              }
+            </div>
+          `
+          : ""
+        }
+
+      </div>
+    `;
+
+    if(i < data.path.length - 1){
+      html += `
+        <div class="connectionArrow">
+          ↓
+        </div>
+      `;
+    }
+  }
+
+  html += `
+
+      <div style="text-align:center;margin-top:25px">
+
+        <button
+          class="cta"
+          onclick="renderSixDegrees()"
+        >
+          Play Again
+        </button>
+
+      </div>
+
+    </div>
+  `;
+
+  output.innerHTML = html;
+}
 
   const results = [...(data.results || [])].sort((a, b) => {
   if (a.result_type === "person" && b.result_type !== "person") return -1;
