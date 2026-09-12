@@ -874,7 +874,7 @@ function renderSearchResults(data){
 
           ${results.map(item => {
 
-            const isPerson = item.media_type === "person";
+            const isPerson = item.result_type === "person";
             const title = isPerson ? item.name : item.title;
             const date = isPerson
               ? "Star"
