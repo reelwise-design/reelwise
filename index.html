@@ -842,7 +842,11 @@ async function performSearch(query){
 
 function renderSearchResults(data){
 
-  const results = data.results || [];
+  const results = [...(data.results || [])].sort((a, b) => {
+  if (a.result_type === "person" && b.result_type !== "person") return -1;
+  if (a.result_type !== "person" && b.result_type === "person") return 1;
+  return 0;
+});
 
   if(!results.length){
     app.innerHTML = `
